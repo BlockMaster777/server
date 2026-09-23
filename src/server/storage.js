@@ -3,6 +3,8 @@ import fsPromises from "fs/promises";
 import path from "path";
 import * as vars from "./vars.js";
 
+let indexWriteQueue = Promise.resolve();
+
 const readJson = async (filePath) => {
 	const content = await fsPromises.readFile(filePath, "utf8");
 	return JSON.parse(content);
@@ -11,12 +13,32 @@ const readJson = async (filePath) => {
 const writeJson = async (filePath, data) =>
 	fsPromises.writeFile(filePath, JSON.stringify(data), "utf8");
 
+async function writeIndexAtomically(indexData) {
+	const serialized = JSON.stringify(indexData);
+	const tempPath = path.join(
+		vars.DATA_PATH,
+		`.index.json.${process.pid}.${Date.now()}.tmp`
+	);
+
+	try {
+		await fsPromises.writeFile(tempPath, serialized, "utf8");
+		await fsPromises.rename(tempPath, vars.DATA_INDEX_PATH);
+	} catch (error) {
+		try {
+			await fsPromises.unlink(tempPath);
+		} catch (_) {}
+		throw error;
+	}
+}
+
 async function getIndex() {
 	return await readJson(vars.DATA_INDEX_PATH);
 }
 
 async function updateIndex(indexData) {
-	await writeJson(vars.DATA_INDEX_PATH, indexData);
+	const write = indexWriteQueue.then(() => writeIndexAtomically(indexData));
+	indexWriteQueue = write.catch(() => {});
+	await write;
 	return true;
 }
 
