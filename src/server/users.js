@@ -11,7 +11,8 @@ import {
 	uploadLimiter,
 	avatarUploadTimeout,
 	escapeHTML,
-	sendEventMessage
+	sendEventMessage,
+	eventFmt
 } from "./helpers.js";
 import { formatAvatarImage } from "./image-processing.js";
 import * as storage from "./storage.js";
@@ -269,7 +270,7 @@ app.post(
 			res.json({ ok: true, avatarId });
 			sendEventMessage([
 				"<b>#AVATAR_UPDATED</b>",
-				`user: <b>${user.username}</b> (id ${user.id})`,
+				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 				`avatar: <b>${avatarId}</b>`
 			]);
 		} catch (error) {
@@ -323,13 +324,13 @@ app.post(
 		if (isDashTeam && req.user.userId !== user.id) {
 			sendEventMessage([
 				"<b>#ADMIN #DESCRIPTION_UPDATED</b>",
-				`admin: <b>${req.user.username}</b> (id ${req.user.userId})`,
-				`user: <b>${user.username}</b> (id ${user.id})`
+				eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
+				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`
 			]);
 		} else {
 			sendEventMessage([
 				"<b>#DESCRIPTION_UPDATED</b>",
-				`user: <b>${user.username}</b> (id ${user.id})`
+				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`
 			]);
 		}
 	}
@@ -482,7 +483,7 @@ app.post(
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
 			"<b>#LINK_ADDED</b>",
-			`user: <b>${user.username}</b> (id ${user.id})`,
+			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`link: <b>${escapeHTML(label)}</b> (<a href="${escapeHTML(link)}">link...</a>)`
 		]);
 	}
@@ -517,7 +518,7 @@ app.post(
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
 			"<b>#LINK_UPDATED</b>",
-			`user: <b>${user.username}</b> (id ${user.id})`,
+			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`idx: ${linkIndex + 1}`,
 			`link: <b>${escapeHTML(label)}</b> (<a href="${escapeHTML(link)}">link...</a>)`
 		]);
@@ -549,7 +550,7 @@ app.post(
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
 			"<b>#LINK_REMOVED</b>",
-			`user: <b>${user.username}</b> (id ${user.id})`,
+			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`idx: ${linkIndex + 1}`
 		]);
 	}

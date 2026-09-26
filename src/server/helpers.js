@@ -164,6 +164,26 @@ const sendEventMessage = async (message) => {
 	} catch (_) {/* ignore */}
 };
 
+const eventFmt = (strings, ...exps) => {
+	let result = "";
+	for (let i = 0; i < strings.length; i++) {
+		result += strings[i];
+		if (i > 0) {
+			switch (exps[i - 1]?.type) {
+				case "user":
+					result += `<b><a href="https://dashblocks.org/user#${exps[i - 1].id}">${exps[i - 1].username}</a></b> (id ${exps[i - 1].id})`;
+					break;
+				case "project":
+					result += `<b><a href="https://dashblocks.org/#${exps[i - 1].id}">${escapeHTML(exps[i - 1].name)}</a></b> (id ${exps[i - 1].id})`;
+					break;
+				default:
+					result += exps[i - 1];
+			}
+		}
+	}
+	return result;
+};
+
 const verifyAuth = (req, res, next) => {
 	const token = req.cookies.auth_token;
 	if (!token) return res.status(401).json({ ok: false, error: "Unauthorized" });
@@ -285,6 +305,7 @@ export {
 	getUserIndexData,
 	escapeHTML,
 	sendEventMessage,
+	eventFmt,
 	verifyAuth,
 	securityCheck,
 	registerLimiter,

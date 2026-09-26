@@ -1,6 +1,12 @@
 import app from "../app.js";
 import * as vars from "./vars.js";
-import { getUserIndexData, securityCheck, verifyAuth, sendEventMessage } from "./helpers.js";
+import {
+	getUserIndexData,
+	securityCheck,
+	verifyAuth,
+	sendEventMessage,
+	eventFmt
+} from "./helpers.js";
 import * as storage from "./storage.js";
 
 app.post("/payments/create", verifyAuth, securityCheck, async (req, res) => {
@@ -136,7 +142,7 @@ app.post("/payments/lava", async (req, res) => {
 		sendEventMessage([
 			"<b>#SUBSCRIPTION</b>",
 			"status: <b>purchased</b>",
-			`user: <b>${user.username}</b> (id ${user.id})`,
+			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`days: <b>${daysToGive}</b>`,
 			`ends: <b><tg-time unix="${endDate.getTime()}" format="dT">${endDate.toISOString()}</tg-time></b>`
 		]);

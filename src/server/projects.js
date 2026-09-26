@@ -12,8 +12,8 @@ import {
 	updateLimiter,
 	projectUploadTimeout,
 	thumbnailUploadTimeout,
-	escapeHTML,
-	sendEventMessage
+	sendEventMessage,
+	eventFmt
 } from "./helpers.js";
 import { formatThumbnailImage } from "./image-processing.js";
 import * as storage from "./storage.js";
@@ -292,14 +292,13 @@ app.post(
 			parentProject
 				? "<b>#FORK #PROJECT_CREATED</b>"
 				: "<b>#PROJECT_CREATED</b>",
-			`project: <b>${escapeHTML(projectName)}</b> (id ${projectId})`,
-			`author: <b>${escapeHTML(user.username)}</b> (id ${user.id})`
+			eventFmt`project: ${{ type: "project", id: projectId, name: projectName }}`,
+			eventFmt`author: ${{ type: "user", id: user.id, username: user.username }}`
 		];
-
 		if (parentProject) {
 			eventMessage.push(
-				`parent project: <b>${escapeHTML(parentProject.name)}</b> (id ${parentProject.id})`,
-				`parent author: <b>${escapeHTML(parentAuthor.username)}</b> (id ${parentAuthor.id})`
+				eventFmt`parent project: ${{ type: "project", id: parentProject.id, name: parentProject.name }}`,
+				eventFmt`parent author: ${{ type: "user", id: parentAuthor.id, username: parentAuthor.username }}`
 			);
 		}
 
@@ -498,15 +497,15 @@ app.patch(
 		if (isDashTeam && userProfile.id !== authorProfile.id) {
 			sendEventMessage([
 				"<b>#ADMIN #PROJECT_METADATA_EDITED</b>",
-				`admin: <b>${userProfile.username}</b> (id ${userProfile.id})`,
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`admin: ${{ type: "user", id: userProfile.id, username: userProfile.username }}`,
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		} else {
 			sendEventMessage([
 				"<b>#PROJECT_METADATA_EDITED</b>",
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		}
 	}
@@ -586,15 +585,15 @@ app.put(
 		if (isDashTeam && userProfile.id !== authorProfile.id) {
 			sendEventMessage([
 				"<b>#ADMIN #PROJECT_EDITED</b>",
-				`admin: <b>${userProfile.username}</b> (id ${userProfile.id})`,
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`admin: ${{ type: "user", id: userProfile.id, username: userProfile.username }}`,
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		} else {
 			sendEventMessage([
 				"<b>#PROJECT_EDITED</b>",
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		}
 	}
@@ -677,15 +676,15 @@ app.delete(
 		if (isDashTeam && userProfile.id !== authorProfile.id) {
 			sendEventMessage([
 				"<b>#ADMIN #PROJECT_DELETED</b>",
-				`admin: <b>${userProfile.username}</b> (id ${userProfile.id})`,
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`admin: ${{ type: "user", id: userProfile.id, username: userProfile.username }}`,
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		} else {
 			sendEventMessage([
 				"<b>#PROJECT_DELETED</b>",
-				`project: <b>${escapeHTML(project.name)}</b> (id ${projectId})`,
-				`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+				eventFmt`project: ${{ type: "project", id: projectId, name: project.name }}`,
+				eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 			]);
 		}
 	}

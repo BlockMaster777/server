@@ -1,5 +1,5 @@
 import app from "../app.js";
-import { securityCheck, verifyAuth, sendEventMessage } from "./helpers.js";
+import { securityCheck, verifyAuth, sendEventMessage, eventFmt } from "./helpers.js";
 import * as storage from "./storage.js";
 
 app.post("/admin/manage-user", verifyAuth, securityCheck, async (req, res) => {
@@ -45,7 +45,7 @@ app.post("/admin/manage-user", verifyAuth, securityCheck, async (req, res) => {
 				type: "promoted",
 				role,
 				...(role === "dash-supporter" && {
-					endDate: endDate || "9999-01-01T00:00:00.000Z"
+					endDate: endDate ? new Date(endDate).toISOString() : "9999-01-01T00:00:00.000Z"
 				}),
 				date: new Date().toISOString()
 			},
@@ -59,12 +59,21 @@ app.post("/admin/manage-user", verifyAuth, securityCheck, async (req, res) => {
 	try {
 		await storage.updateIndex(index);
 		res.json({ ok: true });
-		sendEventMessage([
+
+		const eventMessage = [
 			"<b>#ADMIN #ADMIN_ACTION</b>",
-			`admin: <b>${req.user.username}</b> (id ${req.user.userId})`,
+			eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
 			`action: <b>${action}</b>`,
-			`target: <b>${target.username}</b> (id ${target.id})`
-		]);
+			eventFmt`target: ${{ type: "user", id: target.id, username: target.username }}`
+		];
+		if (action === "promote") {
+			eventMessage.push(`role: <b>${role}</b>`);
+			if (role === "dash-supporter" && endDate) {
+				eventMessage.push(`ends: <b><tg-time unix="${new Date(endDate).getTime()}" format="dT">${new Date(endDate).toISOString()}</tg-time></b>`);
+			}
+		}
+
+		sendEventMessage(eventMessage);
 	} catch (_) {
 		res.status(500).json({ ok: false, error: "Failed to update user index" });
 	}
@@ -114,8 +123,8 @@ app.post("/admin/delete-account", verifyAuth, securityCheck, async (req, res) =>
 		res.status(200).json({ ok: true, message: "Goodbye :(" });
 		sendEventMessage([
 			"<b>#ADMIN #ACCOUNT_DELETED</b>",
-			`admin: <b>${req.user.username}</b> (id ${req.user.userId})`,
-			`target: <b>${username}</b> (id ${userIndexData.id})`
+			eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
+			eventFmt`target: ${{ type: "user", id: userIndexData.id, username }}`
 		]);
 	} catch (_) {
 		res.status(500).json({ ok: false, error: "Failed to delete account" });

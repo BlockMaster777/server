@@ -15,7 +15,8 @@ import {
 	loginLimiter,
 	changePasswordLimiter,
 	deleteAccountLimiter,
-	sendEventMessage
+	sendEventMessage,
+	eventFmt
 } from "./helpers.js";
 import * as storage from "./storage.js";
 
@@ -264,7 +265,7 @@ app.post("/auth/register", registerLimiter, securityCheck, async (req, res) => {
 		});
 		sendEventMessage([
 			"<b>#NEW_ACCOUNT</b>",
-			`user: <b>${username}</b> (id ${userId})`
+			eventFmt`user: ${{ type: "user", id: userId, username }}`
 		]);
 	} catch (error) {
 		res.status(500).json({ ok: false, error: error.message });
@@ -459,7 +460,7 @@ app.post("/auth/change-password", verifyAuth, securityCheck, changePasswordLimit
 		res.json({ ok: true, message: "Password changed. Log in now" });
 		sendEventMessage([
 			"<b>#PASSWORD_CHANGED</b>",
-			`user: <b>${req.user.username}</b> (id ${req.user.userId})`
+			eventFmt`user: ${{ type: "user", id: req.user.userId, username: req.user.username }}`
 		]);
 	} catch (error) {
 		res.status(500).json({ ok: false, error: error.message });
@@ -496,7 +497,7 @@ app.post("/auth/delete-account", verifyAuth, securityCheck, deleteAccountLimiter
 		res.status(200).json({ ok: true, message: "Goodbye :(" });
 		sendEventMessage([
 			"<b>#ACCOUNT_DELETED</b>",
-			`user: <b>${userIndexData.username}</b> (id ${userIndexData.id})`
+			eventFmt`user: ${{ type: "user", id: userIndexData.id, username: userIndexData.username }}`
 		]);
 	} catch (error) {
 		res.status(500).json({ ok: false, error: error.message });

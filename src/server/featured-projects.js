@@ -1,5 +1,11 @@
 import app from "../app.js";
-import { validateId, securityCheck, verifyAuth, escapeHTML, sendEventMessage } from "./helpers.js";
+import {
+	validateId,
+	securityCheck,
+	verifyAuth,
+	sendEventMessage,
+	eventFmt
+} from "./helpers.js";
 import * as storage from "./storage.js";
 
 function formatFeaturedProjects(index, featuredProjects = index.featuredProjects || []) {
@@ -85,9 +91,9 @@ app.post(
 		res.json({ ok: true, projects });
 		sendEventMessage([
 			"<b>#FEATURED_PROJECT</b>",
-			`admin: <b>${req.user.username}</b> (id ${req.user.userId})`,
-			`project: <b>${escapeHTML(projectData.name)}</b> (id ${projectData.id})`,
-			`author: <b>${index.users[authorUsername].username}</b> (id ${index.users[authorUsername].id})`
+			eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
+			eventFmt`project: ${{ type: "project", id: projectData.id, name: projectData.name }}`,
+			eventFmt`author: ${{ type: "user", id: index.users[authorUsername].id, username: index.users[authorUsername].username }}`
 		]);
 	}
 );
@@ -129,9 +135,9 @@ app.delete(
 		res.json({ ok: true, projects });
 		sendEventMessage([
 			"<b>#UNFEATURED_PROJECT</b>",
-			`admin: <b>${req.user.username}</b> (id ${req.user.userId})`,
-			`project: <b>${escapeHTML(featuredProject.name)}</b> (id ${featuredProject.id})`,
-			`author: <b>${authorProfile.username}</b> (id ${authorProfile.id})`
+			eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
+			eventFmt`project: ${{ type: "project", id: featuredProject.id, name: featuredProject.name }}`,
+			eventFmt`author: ${{ type: "user", id: authorProfile.id, username: authorProfile.username }}`
 		]);
 	}
 );
