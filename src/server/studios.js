@@ -192,8 +192,8 @@ app.get("/studios/:id/projects", securityCheck, validateId, (req, res) => {
 	const studio = getStudio(req.usersIndex, req.params.id);
 	if (!studio) return res.status(404).json({ ok: false, error: "Studio not found" });
 
-	let limit = parseInt(req.query.limit, 10);
-	let offset = parseInt(req.query.offset, 10);
+	let limit = parseInt(req.query.limit, 40);
+	let offset = parseInt(req.query.offset, 0);
 	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
 	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
 	const projectIds = studio.projects || [];
