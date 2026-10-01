@@ -98,7 +98,24 @@ app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
 		return res.status(500).json({ ok: false, error: "Failed to create studio" });
 	}
 
-	res.status(201).json({ ok: true, studio });
+	res.json({
+		ok: true,
+		studio: {
+			id: studio.id,
+			owner: {
+				id: studio.ownerId,
+				username: studio.ownerUsername || "Unknown",
+				avatarId: studio.ownerId || 1
+			},
+			name: studio.name || "Untitled Studio",
+			description: studio.description || "",
+			allowProjects: !!studio.allowProjects,
+			projectsCount: (studio.projects || []).length,
+			thumbnailId: studio.thumbnailId || 1,
+			createdAt: studio.createdAt || null,
+			updatedAt: studio.updatedAt || null
+		}
+	});
 });
 
 app.get("/studios/:id", securityCheck, validateId, (req, res) => {
@@ -151,7 +168,24 @@ app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res
 	user.lastActive = studio.updatedAt;
 	await storage.updateIndex(index);
 
-	res.json({ ok: true, studio });
+	res.json({
+		ok: true,
+		studio: {
+			id: studio.id,
+			owner: {
+				id: studio.ownerId,
+				username: studio.ownerUsername || "Unknown",
+				avatarId: studio.ownerId || 1
+			},
+			name: studio.name || "Untitled Studio",
+			description: studio.description || "",
+			allowProjects: !!studio.allowProjects,
+			projectsCount: (studio.projects || []).length,
+			thumbnailId: studio.thumbnailId || 1,
+			createdAt: studio.createdAt || null,
+			updatedAt: studio.updatedAt || null
+		}
+	});
 });
 
 app.get("/studios/:id/projects", securityCheck, validateId, (req, res) => {
@@ -199,7 +233,7 @@ app.post("/studios/:id/projects", verifyAuth, securityCheck, validateId, async (
 	studio.updatedAt = new Date().toISOString();
 	user.lastActive = studio.updatedAt;
 	await storage.updateIndex(index);
-	res.json({ ok: true, projects: studio.projects });
+	res.json({ ok: true });
 });
 
 app.delete("/studios/:id/projects/:projectId", verifyAuth, securityCheck, validateId, async (req, res) => {
@@ -223,7 +257,7 @@ app.delete("/studios/:id/projects/:projectId", verifyAuth, securityCheck, valida
 	studio.updatedAt = new Date().toISOString();
 	user.lastActive = studio.updatedAt;
 	await storage.updateIndex(index);
-	res.json({ ok: true, projects: studio.projects });
+	res.json({ ok: true });
 });
 
 app.post(
