@@ -176,6 +176,9 @@ const eventFmt = (strings, ...exps) => {
 			case "project":
 				result += `<b><a href="https://dashblocks.org/#${exps[i - 1].id}">${escapeHTML(exps[i - 1].name)}</a></b> (id ${exps[i - 1].id})`;
 				break;
+			case "studio":
+				result += `<b><a href="https://dashblocks.org/studio#${exps[i - 1].id}">${escapeHTML(exps[i - 1].name)}</a></b> (id ${exps[i - 1].id})`;
+				break;
 			default:
 				result += exps[i - 1];
 			}

@@ -269,7 +269,7 @@ app.post(
 
 			res.json({ ok: true, avatarId });
 			sendEventMessage([
-				"<b>#AVATAR_UPDATED</b>",
+				"<b>#USER_AVATAR_UPDATED</b>",
 				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 				`avatar: <b>${avatarId}</b>`
 			]);
@@ -323,13 +323,13 @@ app.post(
 		res.json({ ok: true, user: generateUserObject(user) });
 		if (isDashTeam && req.user.userId !== user.id) {
 			sendEventMessage([
-				"<b>#ADMIN #DESCRIPTION_UPDATED</b>",
+				"<b>#ADMIN #USER_DESCRIPTION_UPDATED</b>",
 				eventFmt`admin: ${{ type: "user", id: req.user.userId, username: req.user.username }}`,
 				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`
 			]);
 		} else {
 			sendEventMessage([
-				"<b>#DESCRIPTION_UPDATED</b>",
+				"<b>#USER_DESCRIPTION_UPDATED</b>",
 				eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`
 			]);
 		}
@@ -482,7 +482,7 @@ app.post(
 
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
-			"<b>#LINK_ADDED</b>",
+			"<b>#USER_LINK_ADDED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`link: <b>${escapeHTML(label)}</b> (<a href="${escapeHTML(link)}">link...</a>)`
 		]);
@@ -517,7 +517,7 @@ app.post(
 
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
-			"<b>#LINK_UPDATED</b>",
+			"<b>#USER_LINK_UPDATED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`idx: ${linkIndex + 1}`,
 			`link: <b>${escapeHTML(label)}</b> (<a href="${escapeHTML(link)}">link...</a>)`
@@ -549,7 +549,7 @@ app.post(
 
 		res.json({ ok: true, user: generateUserObject(user) });
 		sendEventMessage([
-			"<b>#LINK_REMOVED</b>",
+			"<b>#USER_LINK_REMOVED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
 			`idx: ${linkIndex + 1}`
 		]);

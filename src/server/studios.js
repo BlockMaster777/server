@@ -7,7 +7,9 @@ import {
 	securityCheck,
 	verifyAuth,
 	uploadLimiter,
-	thumbnailUploadTimeout
+	thumbnailUploadTimeout,
+	sendEventMessage,
+	eventFmt
 } from "./helpers.js";
 import { formatStudioThumbnailImage } from "./image-processing.js";
 import * as storage from "./storage.js";
@@ -116,6 +118,11 @@ app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
 			updatedAt: studio.updatedAt || null
 		}
 	});
+	sendEventMessage([
+		"<b>#STUDIO_CREATED</b>",
+		eventFmt`studio: ${{ type: "studio", id: studio.id, name: studio.name || "Untitled Studio" }}`,
+		eventFmt`owner: ${{ type: "user", id: studio.ownerId, username: studio.ownerUsername }}`
+	]);
 });
 
 app.get("/studios/:id", securityCheck, validateId, (req, res) => {
@@ -186,6 +193,13 @@ app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res
 			updatedAt: studio.updatedAt || null
 		}
 	});
+	if (name !== undefined || description !== undefined) {
+		sendEventMessage([
+			"<b>#STUDIO_EDITED</b>",
+			eventFmt`studio: ${{ type: "studio", id: studio.id, name: studio.name || "Untitled Studio" }}`,
+			eventFmt`owner: ${{ type: "user", id: studio.ownerId, username: studio.ownerUsername }}`
+		]);
+	}
 });
 
 app.get("/studios/:id/projects", securityCheck, validateId, (req, res) => {
@@ -292,6 +306,12 @@ app.post(
 		user.lastActive = studio.updatedAt;
 		await storage.updateIndex(index);
 		res.json({ ok: true, thumbnailId: studio.id });
+		sendEventMessage([
+			"<b>#STUDIO_THUMBNAIL_UPDATED</b>",
+			eventFmt`studio: ${{ type: "studio", id: studio.id, name: studio.name || "Untitled Studio" }}`,
+			eventFmt`owner: ${{ type: "user", id: studio.ownerId, username: studio.ownerUsername }}`,
+			`thumbnail: <b>${studio.thumbnailId}</b>`
+		]);
 	}
 );
 
