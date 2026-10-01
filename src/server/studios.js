@@ -207,10 +207,15 @@ app.delete("/studios/:id/projects/:projectId", verifyAuth, securityCheck, valida
 	const studio = getStudio(index, req.params.id);
 	if (!studio) return res.status(404).json({ ok: false, error: "Studio not found" });
 	const user = index.users[req.user.username.toLowerCase()];
-	if (!isStudioOwner(studio, user))
-		return res.status(403).json({ ok: false, error: "Only the studio owner can remove projects" });
 	if (!/^\d+$/.test(req.params.projectId) || req.params.projectId.startsWith("0"))
 		return res.status(400).json({ ok: false, error: "Invalid project ID" });
+	if (!(studio.projects || []).some((projectId) => String(projectId) === req.params.projectId))
+		return res.status(404).json({ ok: false, error: "Project not found in this studio" });
+
+	const projectOwner = findProjectOwner(index, req.params.projectId);
+	const isProjectOwner = String(projectOwner?.user.id) === String(user?.id);
+	if (!isStudioOwner(studio, user) && !isProjectOwner)
+		return res.status(403).json({ ok: false, error: "Only the studio owner or project owner can remove projects" });
 
 	studio.projects = (studio.projects || []).filter(
 		(projectId) => String(projectId) !== req.params.projectId
