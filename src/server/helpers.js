@@ -14,7 +14,7 @@ const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
 const validateId = (req, res, next) => {
 	const id = req.params.id;
-	if (!id || !/^s?\d+$/.test(id) || id.startsWith("0") || id.startsWith("s0")) {
+	if (!id || !/^\d+$/.test(id) || id.startsWith("0")) {
 		return res.status(400).json({ ok: false, error: "Invalid ID" });
 	}
 	next();

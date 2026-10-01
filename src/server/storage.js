@@ -117,6 +117,27 @@ async function saveThumbnailFile(thumbnailId, buffer) {
 	return fsPromises.writeFile(path.join(projectDir, `${thumbnailId}.png`), buffer);
 }
 
+async function createStudioDirectory(studioId) {
+	const studioDir = path.join(vars.DATA_STUDIOS_PATH, String(studioId));
+	await fsPromises.mkdir(studioDir, { recursive: true });
+	return studioDir;
+}
+
+async function saveStudioThumbnailFile(studioId, buffer) {
+	const studioDir = await createStudioDirectory(studioId);
+	return fsPromises.writeFile(path.join(studioDir, `${studioId}.png`), buffer);
+}
+
+async function studioThumbnailFileExists(studioId) {
+	try {
+		const studioDir = path.join(vars.DATA_STUDIOS_PATH, String(studioId));
+		await fsPromises.access(path.join(studioDir, `${studioId}.png`));
+		return true;
+	} catch (_) {
+		return false;
+	}
+}
+
 async function deleteThumbnailFile(thumbnailId) {
 	try {
 		const projectDir = path.join(vars.DATA_PROJECTS_PATH, String(thumbnailId));
@@ -170,6 +191,9 @@ export {
 	getProjectStats,
 	saveAvatarFile,
 	saveThumbnailFile,
+	createStudioDirectory,
+	saveStudioThumbnailFile,
+	studioThumbnailFileExists,
 	deleteThumbnailFile,
 	avatarFileExists,
 	thumbnailFileExists,

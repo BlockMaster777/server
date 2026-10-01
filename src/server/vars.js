@@ -24,6 +24,7 @@ const DATA_PATH = "/var/lib/dash";
 const DATA_INDEX_PATH = path.join(DATA_PATH, "index.json");
 const DATA_USERS_PATH = path.join(DATA_PATH, "users");
 const DATA_PROJECTS_PATH = path.join(DATA_PATH, "projects");
+const DATA_STUDIOS_PATH = path.join(DATA_PATH, "studios");
 
 const FORBIDDEN_USERNAMES = [
 	"user",
@@ -71,6 +72,7 @@ export {
 	DATA_INDEX_PATH,
 	DATA_USERS_PATH,
 	DATA_PROJECTS_PATH,
+	DATA_STUDIOS_PATH,
 
 	FORBIDDEN_USERNAMES,
 

@@ -3,6 +3,8 @@ import sharp from "sharp";
 const AVATAR_SIZE = 80;
 const THUMBNAIL_WIDTH = 480;
 const THUMBNAIL_HEIGHT = 360;
+const STUDIO_THUMBNAIL_WIDTH = 200;
+const STUDIO_THUMBNAIL_HEIGHT = 130;
 const MAX_INPUT_PIXELS = 50_000_000;
 const MAX_DIMENSION = 10000;
 const PROCESS_TIMEOUT_MS = 10000;
@@ -62,5 +64,6 @@ const createProcessedBuffer = async (buffer, width, height) => {
 
 const formatAvatarImage = async (buffer) => createProcessedBuffer(buffer, AVATAR_SIZE, AVATAR_SIZE);
 const formatThumbnailImage = async (buffer) => createProcessedBuffer(buffer, THUMBNAIL_WIDTH, THUMBNAIL_HEIGHT);
+const formatStudioThumbnailImage = async (buffer) => createProcessedBuffer(buffer, STUDIO_THUMBNAIL_WIDTH, STUDIO_THUMBNAIL_HEIGHT);
 
-export { formatAvatarImage, formatThumbnailImage };
+export { formatAvatarImage, formatThumbnailImage, formatStudioThumbnailImage };
