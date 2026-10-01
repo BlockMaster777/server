@@ -408,7 +408,7 @@ app.post(
 		let avatarFrame = null;
 
 		if (avatarFrameValue === "" || avatarFrameValue === null || avatarFrameValue === undefined) {
-			avatarFrame = null
+			avatarFrame = null;
 		} else if (!vars.AVATAR_FRAMES.includes(avatarFrameValue)) {
 			return res.status(400).json({ ok: false, error: "Frame not exist" });
 		} else {

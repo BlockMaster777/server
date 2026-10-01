@@ -26,7 +26,7 @@ async function writeIndexAtomically(indexData) {
 	} catch (error) {
 		try {
 			await fsPromises.unlink(tempPath);
-		} catch (_) {}
+		} catch (_) {/* ignore */}
 		throw error;
 	}
 }
