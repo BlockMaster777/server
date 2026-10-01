@@ -26,7 +26,7 @@
     "jszip": "^3.10.1",
     "multer": "^2.0.2",
     "resend": "^6.16.0",
-    "sharp": "^0.33.0"
+    "sharp": "^0.35.5"
   },
   "devDependencies": {
     "@types/node": "^22.0.0"
