@@ -257,7 +257,7 @@ app.post("/auth/register", registerLimiter, securityCheck, async (req, res) => {
 		res.json({
 			ok: true,
 			user: {
-				...generateUserObject(newUserMetadata),
+				...generateUserObject(newUserMetadata, index),
 				email: newUserMetadata?.email || null,
 				firedProjects: newUserMetadata?.firedProjects || [],
 				subscription: newUserMetadata?.subscription || { status: "none", startDate: null, endDate: null }
@@ -305,7 +305,7 @@ app.post("/auth/login", loginLimiter, securityCheck, async (req, res) => {
 					return res.status(201).json({
 						ok: true,
 						requiresVerification: true,
-						user: generateUserObject(user),
+						user: generateUserObject(user, index),
 						message: "Verification code sent to your email"
 					});
 				}
@@ -326,7 +326,7 @@ app.post("/auth/login", loginLimiter, securityCheck, async (req, res) => {
 			res.json({
 				ok: true,
 				user: {
-					...generateUserObject(user),
+					...generateUserObject(user, index),
 					email: user?.email || null,
 					firedProjects: user?.firedProjects || [],
 					subscription: user?.subscription || { status: "none", startDate: null, endDate: null }
@@ -365,7 +365,7 @@ app.get("/session", verifyAuth, securityCheck, async (req, res) => {
 	res.json({
 		ok: true,
 		user: {
-			...generateUserObject(metadata),
+			...generateUserObject(metadata, index),
 			email: metadata?.email || null,
 			firedProjects: metadata?.firedProjects || [],
 			subscription: metadata?.subscription || { status: "none", startDate: null, endDate: null }

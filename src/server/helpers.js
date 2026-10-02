@@ -67,7 +67,7 @@ const validateProjectZip = async (file, userRole) => {
 const generateVerificationCode = () =>
 	Math.floor(100000 + Math.random() * 900000).toString();
 
-const generateUserObject = (user) => {
+const generateUserObject = (user, index) => {
 	if (!user || typeof user !== "object") return {
 		id: null,
 		username: "Unknown",
@@ -88,7 +88,8 @@ const generateUserObject = (user) => {
 			stats: {
 				projects: 0,
 				followers: 0,
-				following: 0
+				following: 0,
+				studios: 0
 			},
 			unreadMessages: 0
 		},
@@ -115,7 +116,10 @@ const generateUserObject = (user) => {
 			stats: {
 				projects: user.projects?.length || 0,
 				followers: user.followers?.length || 0,
-				following: user.following?.length || 0
+				following: user.following?.length || 0,
+				studios: Object.values(index?.studios || {}).filter(
+					(studio) => String(studio.ownerId) === String(user.id)
+				).length
 			},
 			unreadMessages: user.unreadMessages || 0
 		},

@@ -39,7 +39,7 @@ app.get("/users/:target", securityCheck, async (req, res) => {
 		res.json({
 			ok: true,
 			user: {
-				...generateUserObject({ ...storedUser, ...indexData }),
+				...generateUserObject({ ...storedUser, ...indexData }, req.usersIndex),
 				isFollowing: user ? (indexData.followers?.some(f => String(f.id) === String(user.userId)) || false) : false
 			}
 		});
@@ -76,6 +76,33 @@ app.get("/users/:target/projects", securityCheck, async (req, res) => {
 	}
 });
 
+app.get("/users/:target/studios", securityCheck, (req, res) => {
+	const index = req.usersIndex;
+	const user = getUserIndexData(index, req.params.target);
+	if (!user) return res.status(404).json({ ok: false, error: "User not found" });
+
+	let limit = parseInt(req.query.limit, 10);
+	let offset = parseInt(req.query.offset, 10);
+	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
+	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
+	const studios = Object.values(index.studios || {})
+		.filter((studio) => String(studio.ownerId) === String(user.id))
+		.slice(offset, offset + limit)
+		.map((studio) => ({
+			id: studio.id,
+			owner: generateUserObject(user, index),
+			name: studio.name || "Untitled Studio",
+			description: studio.description || "",
+			allowProjects: !!studio.allowProjects,
+			projectsCount: (studio.projects || []).length,
+			thumbnailId: studio.thumbnailId || 1,
+			createdAt: studio.createdAt || null,
+			updatedAt: studio.updatedAt || null
+		}));
+
+	res.json({ ok: true, studios });
+});
+
 app.get("/users/:target/actions", securityCheck, async (req, res) => {
 	try {
 		const indexData = getUserIndexData(req.usersIndex, req.params.target);
@@ -108,7 +135,7 @@ app.get("/users/:target/followers", securityCheck, async (req, res) => {
 			.slice(offset, offset + limit)
 			.map(user => req.usersIndex.users[user.username.toLowerCase()])
 			.filter(Boolean)
-			.map(followerData => generateUserObject(followerData));
+			.map(followerData => generateUserObject(followerData, req.usersIndex));
 
 		res.json({ ok: true, followers });
 	} catch (_) {
@@ -130,7 +157,7 @@ app.get("/users/:target/following", securityCheck, async (req, res) => {
 			.slice(offset, offset + limit)
 			.map(user => req.usersIndex.users[user.username.toLowerCase()])
 			.filter(Boolean)
-			.map(followingData => generateUserObject(followingData));
+			.map(followingData => generateUserObject(followingData, req.usersIndex));
 
 		res.json({ ok: true, following });
 	} catch (_) {
@@ -320,7 +347,7 @@ app.post(
         
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 		if (isDashTeam && req.user.userId !== user.id) {
 			sendEventMessage([
 				"<b>#ADMIN #USER_DESCRIPTION_UPDATED</b>",
@@ -391,7 +418,7 @@ app.post(
 
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 	}
 );
 
@@ -423,7 +450,7 @@ app.post(
 
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 	}
 );
 
@@ -451,7 +478,7 @@ app.post(
         
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 	}
 );
 
@@ -480,7 +507,7 @@ app.post(
         
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 		sendEventMessage([
 			"<b>#USER_LINK_ADDED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
@@ -515,7 +542,7 @@ app.post(
         
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 		sendEventMessage([
 			"<b>#USER_LINK_UPDATED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,
@@ -547,7 +574,7 @@ app.post(
         
 		await storage.updateIndex(index);
 
-		res.json({ ok: true, user: generateUserObject(user) });
+		res.json({ ok: true, user: generateUserObject(user, req.usersIndex) });
 		sendEventMessage([
 			"<b>#USER_LINK_REMOVED</b>",
 			eventFmt`user: ${{ type: "user", id: user.id, username: user.username }}`,

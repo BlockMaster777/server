@@ -29,6 +29,21 @@ const findProjectOwner = (index, projectId) => {
 	return null;
 };
 
+const formatStudio = (index, studio) => ({
+	id: studio.id,
+	owner: generateUserObject(
+		index.users[studio.ownerUsername?.toLowerCase()],
+		index
+	),
+	name: studio.name || "Untitled Studio",
+	description: studio.description || "",
+	allowProjects: !!studio.allowProjects,
+	projectsCount: (studio.projects || []).length,
+	thumbnailId: studio.thumbnailId || 1,
+	createdAt: studio.createdAt || null,
+	updatedAt: studio.updatedAt || null
+});
+
 const formatStudioProject = (index, projectId) => {
 	const owner = findProjectOwner(index, projectId);
 	if (!owner) return null;
@@ -106,7 +121,7 @@ app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
 		studio: {
 			id: studio.id,
 			owner: {
-				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
+				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()], req.usersIndex)
 			},
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
@@ -125,25 +140,30 @@ app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
 });
 
 app.get("/studios/:id", securityCheck, validateId, (req, res) => {
-	const studio = getStudio(req.usersIndex, req.params.id);
+	const index = req.usersIndex;
+	const studio = getStudio(index, req.params.id);
 	if (!studio) return res.status(404).json({ ok: false, error: "Studio not found" });
 
-	res.json({
-		ok: true,
-		studio: {
-			id: studio.id,
-			owner: {
-				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
-			},
-			name: studio.name || "Untitled Studio",
-			description: studio.description || "",
-			allowProjects: !!studio.allowProjects,
-			projectsCount: (studio.projects || []).length,
-			thumbnailId: studio.thumbnailId || 1,
-			createdAt: studio.createdAt || null,
-			updatedAt: studio.updatedAt || null
-		}
-	});
+	res.json({ ok: true, studio: formatStudio(index, studio) });
+});
+
+app.get("/projects/:id/studios", securityCheck, validateId, (req, res) => {
+	const index = req.usersIndex;
+	if (!findProjectOwner(index, req.params.id))
+		return res.status(404).json({ ok: false, error: "Project not found" });
+
+	let limit = parseInt(req.query.limit, 10);
+	let offset = parseInt(req.query.offset, 10);
+	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
+	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
+	const studios = Object.values(index.studios || {})
+		.filter((studio) => (studio.projects || []).some(
+			(projectId) => String(projectId) === req.params.id
+		))
+		.slice(offset, offset + limit)
+		.map((studio) => formatStudio(index, studio));
+
+	res.json({ ok: true, studios });
 });
 
 app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res) => {
@@ -177,7 +197,7 @@ app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res
 		studio: {
 			id: studio.id,
 			owner: {
-				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
+				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()], req.usersIndex)
 			},
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
