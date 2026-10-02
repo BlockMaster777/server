@@ -1,5 +1,10 @@
 import app from "../app.js";
-import { securityCheck, searchLimiter, searchTimeout } from "./helpers.js";
+import {
+	getProjectStudiosCount,
+	securityCheck,
+	searchLimiter,
+	searchTimeout
+} from "./helpers.js";
 
 // "d-*" - descending sort methods
 // "a-*" - ascending sort methods
@@ -143,7 +148,8 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 							stats: {
 								views: project.stats?.views || 0,
 								fires: project.stats?.fires || 0,
-								forks: project.stats?.forks || 0
+								forks: project.stats?.forks || 0,
+								studios: getProjectStudiosCount(index, project.id)
 							},
 							author: {
 								id: userProfile.id || null,
@@ -197,7 +203,8 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 							stats: {
 								views: project.stats?.views || 0,
 								fires: project.stats?.fires || 0,
-								forks: project.stats?.forks || 0
+								forks: project.stats?.forks || 0,
+								studios: getProjectStudiosCount(index, project.id)
 							},
 							author: {
 								id: userProfile.id || null,

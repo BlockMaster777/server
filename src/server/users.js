@@ -5,6 +5,7 @@ import app, { imageUpload } from "../app.js";
 import * as vars from "./vars.js";
 import {
 	generateUserObject,
+	getProjectStudiosCount,
 	getUserIndexData,
 	securityCheck,
 	verifyAuth,
@@ -65,7 +66,8 @@ app.get("/users/:target/projects", securityCheck, async (req, res) => {
 			stats: {
 				views: p?.stats?.views || 0,
 				fires: p?.stats?.fires || 0,
-				forks: p?.stats?.forks || 0
+				forks: p?.stats?.forks || 0,
+				studios: getProjectStudiosCount(req.usersIndex, p?.id)
 			},
 			thumbnailId: p?.id || 1
 		}));
@@ -85,7 +87,7 @@ app.get("/users/:target/studios", securityCheck, (req, res) => {
 	let offset = parseInt(req.query.offset, 10);
 	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
 	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
-	const studios = Object.values(index.studios || {})
+	const studios = Object.values(index.studios || {}).toReversed()
 		.filter((studio) => String(studio.ownerId) === String(user.id))
 		.slice(offset, offset + limit)
 		.map((studio) => ({

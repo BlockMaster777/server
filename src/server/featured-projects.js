@@ -1,6 +1,7 @@
 import app from "../app.js";
 import {
 	validateId,
+	getProjectStudiosCount,
 	securityCheck,
 	verifyAuth,
 	sendEventMessage,
@@ -29,6 +30,12 @@ function formatFeaturedProjects(index, featuredProjects = index.featuredProjects
 				joinedAt: author?.joinedAt || null
 			},
 			thumbnailId: project.id || 1,
+			stats: {
+				views: project.stats?.views || 0,
+				fires: project.stats?.fires || 0,
+				forks: project.stats?.forks || 0,
+				studios: getProjectStudiosCount(index, project.id)
+			},
 			uploadedAt: project.uploadedAt || null,
 			featuredAt: featuredProject.featuredAt || null
 		}];

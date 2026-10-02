@@ -4,6 +4,7 @@ import app, { imageUpload } from "../app.js";
 import * as vars from "./vars.js";
 import {
 	validateId,
+	getProjectStudiosCount,
 	generateUserObject,
 	securityCheck,
 	verifyAuth,
@@ -60,7 +61,8 @@ const formatStudioProject = (index, projectId) => {
 		stats: {
 			views: project.stats?.views || 0,
 			fires: project.stats?.fires || 0,
-			forks: project.stats?.forks || 0
+			forks: project.stats?.forks || 0,
+			studios: getProjectStudiosCount(index, project.id)
 		},
 		author: {
 			id: user.id,
@@ -182,7 +184,7 @@ app.get("/projects/:id/studios", securityCheck, validateId, (req, res) => {
 	let offset = parseInt(req.query.offset, 10);
 	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
 	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
-	const studios = Object.values(index.studios || {})
+	const studios = Object.values(index.studios || {}).toReversed()
 		.filter((studio) => (studio.projects || []).some(
 			(projectId) => String(projectId) === req.params.id
 		))
@@ -251,7 +253,7 @@ app.get("/studios/:id/projects", securityCheck, validateId, (req, res) => {
 	let offset = parseInt(req.query.offset, 0);
 	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
 	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
-	const projectIds = studio.projects || [];
+	const projectIds = (studio.projects || []).toReversed();
 	const projects = projectIds
 		.slice(offset, offset + limit)
 		.map((projectId) => formatStudioProject(req.usersIndex, projectId))

@@ -67,6 +67,11 @@ const validateProjectZip = async (file, userRole) => {
 const generateVerificationCode = () =>
 	Math.floor(100000 + Math.random() * 900000).toString();
 
+const getProjectStudiosCount = (index, projectId) =>
+	Object.values(index?.studios || {}).filter((studio) =>
+		(studio.projects || []).some((id) => String(id) === String(projectId))
+	).length;
+
 const generateUserObject = (user, index) => {
 	if (!user || typeof user !== "object") return {
 		id: null,
@@ -332,6 +337,7 @@ export {
 	isTrustedUrl,
 	validateProjectZip,
 	generateVerificationCode,
+	getProjectStudiosCount,
 	generateUserObject,
 	getUserIndexData,
 	escapeHTML,

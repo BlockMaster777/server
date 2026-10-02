@@ -5,6 +5,7 @@ import app, { upload, imageUpload } from "../app.js";
 import * as vars from "./vars.js";
 import {
 	validateId,
+	getProjectStudiosCount,
 	validateProjectZip,
 	securityCheck,
 	verifyAuth,
@@ -349,7 +350,8 @@ app.get("/projects/:id", securityCheck, validateId, async (req, res) => {
 				stats: {
 					views: projectInIndex.stats?.views || 0,
 					fires: projectInIndex.stats?.fires || 0,
-					forks: projectInIndex.stats?.forks || 0
+					forks: projectInIndex.stats?.forks || 0,
+					studios: getProjectStudiosCount(req.usersIndex, req.params.id)
 				},
 				author: {
 					id: authorProfile?.id || null,
@@ -408,7 +410,8 @@ app.get("/projects/:id/forks", securityCheck, validateId, (req, res) => {
 			stats: {
 				views: forkProject.stats?.views || 0,
 				fires: forkProject.stats?.fires || 0,
-				forks: forkProject.stats?.forks || 0
+				forks: forkProject.stats?.forks || 0,
+				studios: getProjectStudiosCount(index, forkProject.id)
 			},
 			author: {
 				id: parentAuthor?.id || null,
@@ -491,7 +494,10 @@ app.patch(
 			project: {
 				id: projectId,
 				name: project.name,
-				description: project.description
+				description: project.description,
+				stats: {
+					studios: getProjectStudiosCount(index, projectId)
+				}
 			}
 		});
 		if (isDashTeam && userProfile.id !== authorProfile.id) {
