@@ -4,6 +4,7 @@ import app, { imageUpload } from "../app.js";
 import * as vars from "./vars.js";
 import {
 	validateId,
+	generateUserObject,
 	securityCheck,
 	verifyAuth,
 	uploadLimiter,
@@ -105,9 +106,7 @@ app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
 		studio: {
 			id: studio.id,
 			owner: {
-				id: studio.ownerId,
-				username: studio.ownerUsername || "Unknown",
-				avatarId: studio.ownerId || 1
+				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
 			},
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
@@ -133,11 +132,7 @@ app.get("/studios/:id", securityCheck, validateId, (req, res) => {
 		ok: true,
 		studio: {
 			id: studio.id,
-			owner: {
-				id: studio.ownerId,
-				username: studio.ownerUsername || "Unknown",
-				avatarId: studio.ownerId || 1
-			},
+			owner: ,
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
 			allowProjects: !!studio.allowProjects,
