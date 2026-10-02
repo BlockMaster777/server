@@ -283,6 +283,30 @@ const projectUploadTimeout = rateLimit({
 	message: { ok: false, error: "Upload timeout, retry in a short moment" }
 });
 
+const studioCreationLimiter = rateLimit({
+	windowMs: 30 * 60 * 1000,
+	max: 10,
+	message: { ok: false, error: "Studio creation limit reached, try again later" }
+});
+
+const studioCreationTimeout = rateLimit({
+	windowMs: 15 * 1000,
+	max: 1,
+	message: { ok: false, error: "Studio creation timeout, retry in a short moment" }
+});
+
+const studioProjectAdditionLimiter = rateLimit({
+	windowMs: 30 * 60 * 1000,
+	max: 10,
+	message: { ok: false, error: "Studio project addition limit reached, try again later" }
+});
+
+const studioProjectAdditionTimeout = rateLimit({
+	windowMs: 15 * 1000,
+	max: 1,
+	message: { ok: false, error: "Studio project addition timeout, retry in a short moment" }
+});
+
 const thumbnailUploadTimeout = rateLimit({
 	windowMs: 15 * 1000,
 	max: 1,
@@ -323,6 +347,10 @@ export {
 	updateLimiter,
 	searchLimiter,
 	projectUploadTimeout,
+	studioCreationLimiter,
+	studioCreationTimeout,
+	studioProjectAdditionLimiter,
+	studioProjectAdditionTimeout,
 	thumbnailUploadTimeout,
 	avatarUploadTimeout,
 	searchTimeout

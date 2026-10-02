@@ -8,6 +8,10 @@ import {
 	securityCheck,
 	verifyAuth,
 	uploadLimiter,
+	studioCreationLimiter,
+	studioCreationTimeout,
+	studioProjectAdditionLimiter,
+	studioProjectAdditionTimeout,
 	thumbnailUploadTimeout,
 	sendEventMessage,
 	eventFmt
@@ -66,7 +70,7 @@ const formatStudioProject = (index, projectId) => {
 	};
 };
 
-app.post("/studios", verifyAuth, securityCheck, async (req, res) => {
+app.post("/studios", verifyAuth, securityCheck, studioCreationLimiter, studioCreationTimeout, async (req, res) => {
 	const user = req.usersIndex.users[req.user.username.toLowerCase()];
 	if (!user)
 		return res.status(404).json({ ok: false, error: "User account not found" });
@@ -234,7 +238,7 @@ app.get("/studios/:id/projects", securityCheck, validateId, (req, res) => {
 	res.json({ ok: true, projects });
 });
 
-app.post("/studios/:id/projects", verifyAuth, securityCheck, validateId, async (req, res) => {
+app.post("/studios/:id/projects", verifyAuth, securityCheck, studioProjectAdditionLimiter, studioProjectAdditionTimeout, validateId, async (req, res) => {
 	const index = req.usersIndex;
 	const studio = getStudio(index, req.params.id);
 	if (!studio) return res.status(404).json({ ok: false, error: "Studio not found" });
