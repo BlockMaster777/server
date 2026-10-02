@@ -43,7 +43,7 @@ const formatStudio = (index, studio) => ({
 	description: studio.description || "",
 	allowProjects: !!studio.allowProjects,
 	projectsCount: (studio.projects || []).length,
-	thumbnailId: studio.thumbnailId || 1,
+	thumbnailId: studio.id || 1,
 	createdAt: studio.createdAt || null,
 	updatedAt: studio.updatedAt || null
 });
@@ -105,7 +105,7 @@ app.post("/studios", verifyAuth, securityCheck, studioCreationLimiter, studioCre
 		description: req.body.description || "",
 		allowProjects: false,
 		projects: [],
-		thumbnailId: 1,
+		thumbnailId: studioId,
 		createdAt: now,
 		updatedAt: now
 	};
@@ -131,7 +131,7 @@ app.post("/studios", verifyAuth, securityCheck, studioCreationLimiter, studioCre
 			description: studio.description || "",
 			allowProjects: !!studio.allowProjects,
 			projectsCount: (studio.projects || []).length,
-			thumbnailId: studio.thumbnailId || 1,
+			thumbnailId: studio.id || 1,
 			createdAt: studio.createdAt || null,
 			updatedAt: studio.updatedAt || null
 		}
@@ -320,7 +320,6 @@ app.post(
 			return res.status(500).json({ ok: false, error: "Upload failed" });
 		}
 
-		studio.thumbnailId = studio.id;
 		studio.updatedAt = new Date().toISOString();
 		user.lastActive = studio.updatedAt;
 		await storage.updateIndex(index);
@@ -329,7 +328,7 @@ app.post(
 			"<b>#STUDIO_THUMBNAIL_UPDATED</b>",
 			eventFmt`studio: ${{ type: "studio", id: studio.id, name: studio.name || "Untitled Studio" }}`,
 			eventFmt`owner: ${{ type: "user", id: studio.ownerId, username: studio.ownerUsername }}`,
-			`thumbnail: <b>${studio.thumbnailId}</b>`
+			`thumbnail: <b>${studio.id}</b>`
 		]);
 	}
 );

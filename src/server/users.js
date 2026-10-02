@@ -95,7 +95,7 @@ app.get("/users/:target/studios", securityCheck, (req, res) => {
 			description: studio.description || "",
 			allowProjects: !!studio.allowProjects,
 			projectsCount: (studio.projects || []).length,
-			thumbnailId: studio.thumbnailId || 1,
+			thumbnailId: studio.id || 1,
 			createdAt: studio.createdAt || null,
 			updatedAt: studio.updatedAt || null
 		}));
