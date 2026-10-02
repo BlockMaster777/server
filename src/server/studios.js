@@ -132,7 +132,9 @@ app.get("/studios/:id", securityCheck, validateId, (req, res) => {
 		ok: true,
 		studio: {
 			id: studio.id,
-			owner: ,
+			owner: {
+				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
+			},
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
 			allowProjects: !!studio.allowProjects,
@@ -175,9 +177,7 @@ app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res
 		studio: {
 			id: studio.id,
 			owner: {
-				id: studio.ownerId,
-				username: studio.ownerUsername || "Unknown",
-				avatarId: studio.ownerId || 1
+				...generateUserObject(req.usersIndex.users[studio.ownerUsername.toLowerCase()])
 			},
 			name: studio.name || "Untitled Studio",
 			description: studio.description || "",
