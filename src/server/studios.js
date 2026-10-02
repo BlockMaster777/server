@@ -252,17 +252,16 @@ app.post("/studios/:id/projects", verifyAuth, securityCheck, studioProjectAdditi
 	const projectId = req.body?.projectId;
 	if (!Number.isSafeInteger(Number(projectId)) || Number(projectId) < 1)
 		return res.status(400).json({ ok: false, error: "Invalid project ID" });
-	const userProject = (user.projects || []).find(
-		(project) => String(project.id) === String(projectId)
-	);
-	if (!userProject)
-		return res.status(404).json({ ok: false, error: "Project not found in your profile" });
+
+	const projectOwner = findProjectOwner(index, projectId);
+	if (!projectOwner)
+		return res.status(404).json({ ok: false, error: "Project not found" });
 
 	studio.projects = studio.projects || [];
 	if (studio.projects.some((id) => String(id) === String(projectId)))
 		return res.status(409).json({ ok: false, error: "Project is already in this studio" });
 
-	studio.projects.push(userProject.id);
+	studio.projects.push(projectOwner.project.id);
 	studio.updatedAt = new Date().toISOString();
 	user.lastActive = studio.updatedAt;
 	await storage.updateIndex(index);
