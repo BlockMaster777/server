@@ -123,6 +123,14 @@ async function createStudioDirectory(studioId) {
 	return studioDir;
 }
 
+async function deleteStudioDirectory(studioId) {
+	try {
+		const studioDir = path.join(vars.DATA_STUDIOS_PATH, String(studioId));
+		await fsPromises.rm(studioDir, { recursive: true, force: true });
+	} catch (_) {
+	}
+}
+
 async function saveStudioThumbnailFile(studioId, buffer) {
 	const studioDir = await createStudioDirectory(studioId);
 	return fsPromises.writeFile(path.join(studioDir, `${studioId}.png`), buffer);
@@ -192,6 +200,7 @@ export {
 	saveAvatarFile,
 	saveThumbnailFile,
 	createStudioDirectory,
+	deleteStudioDirectory,
 	saveStudioThumbnailFile,
 	studioThumbnailFileExists,
 	deleteThumbnailFile,
