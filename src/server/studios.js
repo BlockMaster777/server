@@ -143,6 +143,28 @@ app.post("/studios", verifyAuth, securityCheck, studioCreationLimiter, studioCre
 	]);
 });
 
+app.delete("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res) => {
+	const index = req.usersIndex;
+	const studio = getStudio(index, req.params.id);
+	if (!studio) return res.status(404).json({ ok: false, error: "Studio not found" });
+
+	const user = index.users[req.user.username.toLowerCase()];
+	if (!isStudioOwner(studio, user))
+		return res.status(403).json({ ok: false, error: "Only the studio owner can delete it" });
+
+	await storage.deleteStudioDirectory(studio.id);
+	delete index.studios[String(req.params.id)];
+	user.lastActive = new Date().toISOString();
+	await storage.updateIndex(index);
+
+	res.json({ ok: true });
+	sendEventMessage([
+		"<b>#STUDIO_DELETED</b>",
+		eventFmt`studio: ${{ type: "studio", id: studio.id, name: studio.name || "Untitled Studio" }}`,
+		eventFmt`owner: ${{ type: "user", id: studio.ownerId, username: studio.ownerUsername }}`
+	]);
+});
+
 app.get("/studios/:id", securityCheck, validateId, (req, res) => {
 	const index = req.usersIndex;
 	const studio = getStudio(index, req.params.id);
