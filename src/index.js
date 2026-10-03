@@ -6,7 +6,7 @@ import "./server/studios.js";
 import "./server/search.js";
 import "./server/users.js";
 import "./server/admin.js";
-import "./server/featured-projects.js";
+import "./server/featured.js";
 import "./server/payments.js";
 
 function checkSubs() {

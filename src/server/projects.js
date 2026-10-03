@@ -325,6 +325,39 @@ app.get("/get-project/:id", securityCheck, validateId, async (req, res) => {
 	}
 });
 
+app.get("/projects/latest", securityCheck, (req, res) => {
+	const index = req.usersIndex;
+	const projects = Object.values(index.users).flatMap((author) =>
+		(author.projects || []).map((project) => ({
+			id: project.id || null,
+			name: project.name || "Untitled",
+			description: project.description || "",
+			thumbnailId: project.id || 1,
+			stats: {
+				views: project.stats?.views || 0,
+				fires: project.stats?.fires || 0,
+				forks: project.stats?.forks || 0,
+				studios: getProjectStudiosCount(index, project.id)
+			},
+			author: {
+				id: author.id || null,
+				username: author.username || "Unknown",
+				role: author.role || "dasher",
+				profile: { avatarId: author.id || 1 },
+				joinedAt: author.joinedAt || null,
+				lastActive: author.lastActive || null
+			},
+			uploadedAt: project.uploadedAt || null
+		}))
+	);
+	projects.sort((a, b) =>
+		new Date(b.uploadedAt || 0).getTime() -
+			new Date(a.uploadedAt || 0).getTime()
+	);
+
+	res.json({ ok: true, projects: projects.slice(0, 20) });
+});
+
 app.get("/projects/:id", securityCheck, validateId, async (req, res) => {
 	try {
 		const projectInIndex = storage.findProjectById(req.usersIndex, req.params.id);
