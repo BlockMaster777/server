@@ -8,7 +8,7 @@ import {
 
 // "d-*" - descending sort methods
 // "a-*" - ascending sort methods
-const SORT_METHODS = {
+const PROJECTS_SORT_METHODS = {
 	"d-upload": (p1, p2) => (
 		new Date(p2.uploadedAt || 0).getTime() -
 			new Date(p1.uploadedAt || 0).getTime()
@@ -20,8 +20,18 @@ const SORT_METHODS = {
 	"d-fires": (p1, p2) => (p2.stats?.fires || 0) - (p1.stats?.fires || 0),
 	"d-forks": (p1, p2) => (p2.stats?.forks || 0) - (p1.stats?.forks || 0)
 };
+const STUDIOS_SORT_METHODS = {
+	"d-create": (s1, s2) => (
+		new Date(s2.createdAt || 0).getTime() -
+			new Date(s1.createdAt || 0).getTime()
+	),
+	"a-create": function(s1, s2) {
+		return this["d-create"](s1, s2) * -1;
+	},
+	"d-projects": (s1, s2) => (s2.projects || []).length - (s1.projects || []).length
+};
 
-const SEARCH_PARAMS_DEFS = {
+const PROJECTS_SEARCH_PARAMS_DEFS = {
 	author: {
 		priority: 1,
 		get: (index, paramValue) => {
@@ -77,6 +87,36 @@ const SEARCH_PARAMS_DEFS = {
 		filterFn: (project) => !project.parentId
 	}
 };
+const STUDIOS_SEARCH_PARAMS_DEFS = {
+	owner: {
+		priority: 1,
+		filterFn: (studio, _, paramValue) => (
+			studio.ownerUsername.toLowerCase() === paramValue.toLowerCase() ||
+			studio.ownerId === Number(paramValue)
+		)
+	},
+	featured: {
+		priority: 1,
+		filterFn: (studio, index) => (
+			index.featuredStudios &&
+			index.featuredStudios.some((featuredStudio) => featuredStudio.id === studio.id)
+		)
+	},
+	"-owner": {
+		priority: 2,
+		filterFn: (studio, _, paramValue) => (
+			studio.ownerUsername.toLowerCase() !== paramValue.toLowerCase() &&
+			studio.ownerId !== Number(paramValue)
+		)
+	},
+	"-featured": {
+		priority: 2,
+		filterFn: (studio, index) => (
+			!index.featuredStudios ||
+			index.featuredStudios.every((featuredStudio) => featuredStudio.id !== studio.id)
+		)
+	}
+};
 
 app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (req, res) => {
 	try {
@@ -97,10 +137,10 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 		const searchParams = [];
 		const searchTerm = q.trim()
 			.replace(paramRegex, (substr, paramName, paramValue) => {
-				if (paramName === "sort" && paramValue in SORT_METHODS) {
+				if (paramName === "sort" && paramValue in PROJECTS_SORT_METHODS) {
 					sortMethod = paramValue;
 					return "";
-				} else if (paramName in SEARCH_PARAMS_DEFS) {
+				} else if (paramName in PROJECTS_SEARCH_PARAMS_DEFS) {
 					searchParams.push([paramName, paramValue]);
 					return "";
 				} else {
@@ -110,15 +150,15 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 			.toLowerCase();
 		if (!sortMethod) sortMethod = "d-upload";
 		searchParams.sort(([paramName1], [paramName2]) =>
-			SEARCH_PARAMS_DEFS[paramName1].priority - SEARCH_PARAMS_DEFS[paramName2].priority);
-		const priorGetterParam = searchParams.find(([paramName]) => SEARCH_PARAMS_DEFS[paramName].get);
-		const userMatchParams = searchParams.filter(([paramName]) => SEARCH_PARAMS_DEFS[paramName].userMatch);
+			PROJECTS_SEARCH_PARAMS_DEFS[paramName1].priority - PROJECTS_SEARCH_PARAMS_DEFS[paramName2].priority);
+		const priorGetterParam = searchParams.find(([paramName]) => PROJECTS_SEARCH_PARAMS_DEFS[paramName].get);
+		const userMatchParams = searchParams.filter(([paramName]) => PROJECTS_SEARCH_PARAMS_DEFS[paramName].userMatch);
 
 		const results = [];
 
 		if (priorGetterParam) {
 			const { projects, userProfile } =
-				SEARCH_PARAMS_DEFS[priorGetterParam[0]].get(index, priorGetterParam[1]);
+				PROJECTS_SEARCH_PARAMS_DEFS[priorGetterParam[0]].get(index, priorGetterParam[1]);
 			if (projects.length > 0) {
 				const filterParams = searchParams.filter((param) => param !== priorGetterParam);
 
@@ -128,7 +168,7 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 				projects.forEach((project) => {
 					let projectMatch = true;
 					for (let i = 0; i < filterParams.length && projectMatch; i++) {
-						projectMatch = SEARCH_PARAMS_DEFS[filterParams[i][0]]
+						projectMatch = PROJECTS_SEARCH_PARAMS_DEFS[filterParams[i][0]]
 							.filterFn(project, userProfile, index, filterParams[i][1]);
 					}
 					if (!projectMatch) return;
@@ -165,14 +205,14 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 		} else {
 			const filterParams = searchParams.filter((param) => (
 				param !== priorGetterParam &&
-				!SEARCH_PARAMS_DEFS[param[0]].userMatch
+				!PROJECTS_SEARCH_PARAMS_DEFS[param[0]].userMatch
 			));
 			Object.values(index.users).forEach((userProfile) => {
 				if (!userProfile.projects || userProfile.projects.length === 0) return;
 
 				let authorMatch = true;
 				for (let i = 0; i < userMatchParams.length && authorMatch; i++) {
-					authorMatch = SEARCH_PARAMS_DEFS[userMatchParams[i][0]]
+					authorMatch = PROJECTS_SEARCH_PARAMS_DEFS[userMatchParams[i][0]]
 						.userMatch(index, userMatchParams[i][1]);
 				}
 				if (!authorMatch) return;
@@ -183,7 +223,7 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 				userProfile.projects.forEach((project) => {
 					let projectMatch = true;
 					for (let i = 0; i < filterParams.length && projectMatch; i++) {
-						projectMatch = SEARCH_PARAMS_DEFS[filterParams[i][0]]
+						projectMatch = PROJECTS_SEARCH_PARAMS_DEFS[filterParams[i][0]]
 							.filterFn(project, userProfile, index, filterParams[i][1]);
 					}
 					if (!projectMatch) return;
@@ -219,7 +259,7 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 			});
 		}
 
-		results.sort(SORT_METHODS[sortMethod]);
+		results.sort(PROJECTS_SORT_METHODS[sortMethod]);
 		const finalResults = results.slice(offset, offset + limit);
 
 		res.json({
@@ -229,5 +269,89 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 		});
 	} catch (_) {
 		res.status(500).json({ ok: false, error: "Failed to search projects" });
+	}
+});
+
+app.get("/search/studios", searchLimiter, searchTimeout, securityCheck, async (req, res) => {
+	try {
+		const { q } = req.query;
+		let limit = parseInt(req.query.limit, 10);
+		let offset = parseInt(req.query.offset, 10);
+		limit = isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40); 
+		offset = isNaN(offset) ? 0 : Math.max(0, offset);
+		const index = req.usersIndex;
+
+		if (!q || typeof q !== "string" || q.trim().length === 0)
+			return res.status(400).json({ ok: false, error: "IDK what to search :P" });
+		if (q.trim().length > 200)
+			return res.status(400).json({ ok: false, error: "Query is too long (maximum length 200, excluding trimmed white spaces)" });
+
+		const paramRegex = /\s*(-?[a-z]+):(\S*)\s*/gi;
+		let sortMethod = null;
+		const searchParams = [];
+		const searchTerm = q.trim()
+			.replace(paramRegex, (substr, paramName, paramValue) => {
+				if (paramName === "sort" && paramValue in STUDIOS_SORT_METHODS) {
+					sortMethod = paramValue;
+					return "";
+				} else if (paramName in STUDIOS_SEARCH_PARAMS_DEFS) {
+					searchParams.push([paramName, paramValue]);
+					return "";
+				} else {
+					return substr;
+				}
+			})
+			.toLowerCase();
+		if (!sortMethod) sortMethod = "d-created";
+		searchParams.sort(([paramName1], [paramName2]) =>
+			STUDIOS_SEARCH_PARAMS_DEFS[paramName1].priority - STUDIOS_SEARCH_PARAMS_DEFS[paramName2].priority);
+
+		const results = [];
+
+		Object.values(index.studios).forEach((studio) => {
+			const ownerUsername = studio.ownerUsername.toLowerCase();
+			const ownerUsernameMatch = ownerUsername.includes(searchTerm);
+
+			let studioMatch = true;
+			for (let i = 0; i < searchParams.length && studioMatch; i++) {
+				studioMatch = PROJECTS_SEARCH_PARAMS_DEFS[searchParams[i][0]]
+					.filterFn(studio, index, searchParams[i][1]);
+			}
+			if (!studioMatch) return;
+
+			const studioName = (studio.name || "").toLowerCase();
+			const studioDescription = (studio.description || "").toLowerCase();
+
+			const nameMatch = studioName.includes(searchTerm);
+			const descriptionMatch = studioDescription.includes(searchTerm);
+
+			if (nameMatch || descriptionMatch || ownerUsernameMatch) {
+				results.push({
+					id: studio.id,
+					owner: generateUserObject(
+						index.users[studio.ownerUsername?.toLowerCase()],
+						index
+					),
+					name: studio.name || "Untitled Studio",
+					description: studio.description || "",
+					allowProjects: !!studio.allowProjects,
+					projectsCount: (studio.projects || []).length,
+					thumbnailId: studio.id || 1,
+					createdAt: studio.createdAt || null,
+					updatedAt: studio.updatedAt || null
+				});
+			}
+		});
+
+		results.sort(STUDIOS_SORT_METHODS[sortMethod]);
+		const finalResults = results.slice(offset, offset + limit);
+
+		res.json({
+			ok: true,
+			total: results.length,
+			results: finalResults
+		});
+	} catch (_) {
+		res.status(500).json({ ok: false, error: "Failed to search studios" });
 	}
 });
