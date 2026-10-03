@@ -102,15 +102,21 @@ const STUDIOS_SEARCH_PARAMS_DEFS = {
 			index.featuredStudios.some((featuredStudio) => featuredStudio.id === studio.id)
 		)
 	},
-	"-owner": {
+	studiosof: {
 		priority: 2,
+		filterFn: (studio, _, paramValue) => (studio.projects || []).some(
+			(projectId) => projectId === Number(paramValue)
+		)
+	},
+	"-owner": {
+		priority: 3,
 		filterFn: (studio, _, paramValue) => (
 			studio.ownerUsername.toLowerCase() !== paramValue.toLowerCase() &&
 			studio.ownerId !== Number(paramValue)
 		)
 	},
 	"-featured": {
-		priority: 2,
+		priority: 3,
 		filterFn: (studio, index) => (
 			!index.featuredStudios ||
 			index.featuredStudios.every((featuredStudio) => featuredStudio.id !== studio.id)
