@@ -153,6 +153,8 @@ app.post(
 
 		const project = {
 			id: projectId,
+			collaborators: [],
+			collaborationRevision: 0,
 			name: projectName,
 			description: description || "",
 			parentId: parentProject?.id || null,

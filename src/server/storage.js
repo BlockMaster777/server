@@ -36,10 +36,36 @@ async function getIndex() {
 }
 
 async function updateIndex(indexData) {
-	const write = indexWriteQueue.then(() => writeIndexAtomically(indexData));
+	const write = indexWriteQueue.then(async () => {
+		const current = await getIndex();
+		const projects = new Map();
+		for (const user of Object.values(current.users)) {
+			for (const project of user.projects || []) projects.set(String(project.id), project);
+		}
+		for (const user of Object.values(indexData.users)) {
+			for (const project of user.projects || []) {
+				const saved = projects.get(String(project.id));
+				if (!saved) continue;
+				project.collaborators = structuredClone(saved.collaborators || []);
+				project.collaborationRevision = saved.collaborationRevision || 0;
+			}
+		}
+		await writeIndexAtomically(indexData);
+	});
 	indexWriteQueue = write.catch(() => {});
 	await write;
 	return true;
+}
+
+async function mutateIndex(mutate) {
+	const write = indexWriteQueue.then(async () => {
+		const index = await getIndex();
+		const result = await mutate(index);
+		await writeIndexAtomically(index);
+		return result;
+	});
+	indexWriteQueue = write.catch(() => {});
+	return await write;
 }
 
 async function createUserJson(userId, userData) {
@@ -128,6 +154,7 @@ async function deleteStudioDirectory(studioId) {
 		const studioDir = path.join(vars.DATA_STUDIOS_PATH, String(studioId));
 		await fsPromises.rm(studioDir, { recursive: true, force: true });
 	} catch (_) {
+		// ignore
 	}
 }
 
@@ -188,6 +215,7 @@ export {
 	readJson,
 	getIndex,
 	updateIndex,
+	mutateIndex,
 	createUserJson,
 	readUserJson,
 	updateUserJson,
