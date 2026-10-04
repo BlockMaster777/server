@@ -143,11 +143,14 @@ app.get("/search/projects", searchLimiter, searchTimeout, securityCheck, async (
 		const searchParams = [];
 		const searchTerm = q.trim()
 			.replace(paramRegex, (substr, paramName, paramValue) => {
-				if (paramName === "sort" && paramValue in PROJECTS_SORT_METHODS) {
-					sortMethod = paramValue;
+				if (
+					paramName.toLowerCase() === "sort" &&
+					paramValue.toLowerCase() in PROJECTS_SORT_METHODS
+				) {
+					sortMethod = paramValue.toLowerCase();
 					return "";
-				} else if (paramName in PROJECTS_SEARCH_PARAMS_DEFS) {
-					searchParams.push([paramName, paramValue]);
+				} else if (paramName.toLowerCase() in PROJECTS_SEARCH_PARAMS_DEFS) {
+					searchParams.push([paramName.toLowerCase(), paramValue]);
 					return "";
 				} else {
 					return substr;
@@ -297,11 +300,14 @@ app.get("/search/studios", searchLimiter, searchTimeout, securityCheck, async (r
 		const searchParams = [];
 		const searchTerm = q.trim()
 			.replace(paramRegex, (substr, paramName, paramValue) => {
-				if (paramName === "sort" && paramValue in STUDIOS_SORT_METHODS) {
-					sortMethod = paramValue;
+				if (
+					paramName.toLowerCase() === "sort" &&
+					paramValue.toLowerCase() in STUDIOS_SORT_METHODS
+				) {
+					sortMethod = paramValue.toLowerCase();
 					return "";
-				} else if (paramName in STUDIOS_SEARCH_PARAMS_DEFS) {
-					searchParams.push([paramName, paramValue]);
+				} else if (paramName.toLowerCase() in STUDIOS_SEARCH_PARAMS_DEFS) {
+					searchParams.push([paramName.toLowerCase(), paramValue]);
 					return "";
 				} else {
 					return substr;
@@ -320,7 +326,7 @@ app.get("/search/studios", searchLimiter, searchTimeout, securityCheck, async (r
 
 			let studioMatch = true;
 			for (let i = 0; i < searchParams.length && studioMatch; i++) {
-				studioMatch = PROJECTS_SEARCH_PARAMS_DEFS[searchParams[i][0]]
+				studioMatch = STUDIOS_SEARCH_PARAMS_DEFS[searchParams[i][0]]
 					.filterFn(studio, index, searchParams[i][1]);
 			}
 			if (!studioMatch) return;
