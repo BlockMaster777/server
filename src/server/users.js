@@ -77,12 +77,12 @@ app.get("/users/:target/projects", securityCheck, async (req, res) => {
 				profile: { avatarId: author.id || 1 },
 				joinedAt: author.joinedAt || null,
 				lastActive: author.lastActive || null
-			},
+			}
 		}));
 
 		res.json({
 			ok: true,
-			total: (indexData.projects?.toReversed() || []).length,
+			total: (author.projects?.toReversed() || []).length,
 			projects
 		});
 	} catch (_) {
