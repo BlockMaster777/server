@@ -51,28 +51,40 @@ app.get("/users/:target", securityCheck, async (req, res) => {
 
 app.get("/users/:target/projects", securityCheck, async (req, res) => {
 	try {
-		const indexData = getUserIndexData(req.usersIndex, req.params.target);
-		if (!indexData) throw new Error("User not found");
+		const author = getUserIndexData(req.usersIndex, req.params.target);
+		if (!author) throw new Error("User not found");
 
 		let limit = parseInt(req.query.limit, 10);
 		let offset = parseInt(req.query.offset, 10);
 		limit = isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40); 
 		offset = isNaN(offset) ? 0 : Math.max(0, offset);
         
-		const projects = (indexData.projects?.toReversed() || []).slice(offset, offset + limit).map(p => ({
+		const projects = (author.projects?.toReversed() || []).slice(offset, offset + limit).map(p => ({
 			id: p?.id || null,
 			name: p?.name || "Unknown",
 			description: p?.description || "",
+			thumbnailId: p?.id || 1,
 			stats: {
 				views: p?.stats?.views || 0,
 				fires: p?.stats?.fires || 0,
 				forks: p?.stats?.forks || 0,
 				studios: getProjectStudiosCount(req.usersIndex, p?.id)
 			},
-			thumbnailId: p?.id || 1
+			author: {
+				id: author.id || null,
+				username: author.username || "Unknown",
+				role: author.role || "dasher",
+				profile: { avatarId: author.id || 1 },
+				joinedAt: author.joinedAt || null,
+				lastActive: author.lastActive || null
+			},
 		}));
 
-		res.json({ ok: true, projects });
+		res.json({
+			ok: true,
+			total: (indexData.projects?.toReversed() || []).length,
+			projects
+		});
 	} catch (_) {
 		res.status(404).json({ ok: false, error: "User not found" });
 	}
@@ -88,7 +100,8 @@ app.get("/users/:target/studios", securityCheck, (req, res) => {
 	limit = Number.isNaN(limit) ? 40 : Math.min(Math.max(1, limit), 40);
 	offset = Number.isNaN(offset) ? 0 : Math.max(0, offset);
 	const studios = Object.values(index.studios || {}).toReversed()
-		.filter((studio) => String(studio.ownerId) === String(user.id))
+		.filter((studio) => String(studio.ownerId) === String(user.id));
+	const formattedStudios = studios
 		.slice(offset, offset + limit)
 		.map((studio) => ({
 			id: studio.id,
@@ -102,7 +115,11 @@ app.get("/users/:target/studios", securityCheck, (req, res) => {
 			updatedAt: studio.updatedAt || null
 		}));
 
-	res.json({ ok: true, studios });
+	res.json({
+		ok: true,
+		total: studios.length,
+		studios: formattedStudios
+	});
 });
 
 app.get("/users/:target/actions", securityCheck, async (req, res) => {

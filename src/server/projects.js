@@ -460,7 +460,11 @@ app.get("/projects/:id/forks", securityCheck, validateId, (req, res) => {
 		}];
 	});
 
-	res.json({ ok: true, forks });
+	res.json({
+		ok: true,
+		total: (project.forks || []).length,
+		forks
+	});
 });
 
 app.patch(

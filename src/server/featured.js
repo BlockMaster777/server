@@ -180,7 +180,11 @@ app.get(["/featured/projects", "/featured-projects"], securityCheck, (req, res) 
 	offset = isNaN(offset) ? 0 : Math.max(0, offset);
 	const featuredProjects = (req.usersIndex.featuredProjects || []).slice(offset, offset + limit);
 	const projects = formatFeaturedProjects(req.usersIndex, featuredProjects);
-	res.json({ ok: true, projects });
+	res.json({
+		ok: true,
+		total: (req.usersIndex.featuredProjects || []).length,
+		projects
+	});
 });
 
 app.post("/featured/studios/:id", verifyAuth, securityCheck, validateId, async (req, res) => {
@@ -242,6 +246,9 @@ app.get("/featured/studios", securityCheck, (req, res) => {
 	offset = isNaN(offset) ? 0 : Math.max(0, offset);
 	const featuredStudios = (req.usersIndex.featuredStudios || []).slice(offset, offset + limit);
 	const studios = formatFeaturedStudios(req.usersIndex, featuredStudios);
-
-	res.json({ ok: true, studios });
+	res.json({
+		ok: true,
+		total: (req.usersIndex.featuredStudios || []).length,
+		studios
+	});
 });

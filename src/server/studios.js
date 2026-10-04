@@ -187,11 +187,16 @@ app.get("/projects/:id/studios", securityCheck, validateId, (req, res) => {
 	const studios = Object.values(index.studios || {}).toReversed()
 		.filter((studio) => (studio.projects || []).some(
 			(projectId) => String(projectId) === req.params.id
-		))
+		));
+	const formattedStudios = studios
 		.slice(offset, offset + limit)
 		.map((studio) => formatStudio(index, studio));
 
-	res.json({ ok: true, studios });
+	res.json({
+		ok: true,
+		total: studios.length,
+		studios: formattedStudios
+	});
 });
 
 app.patch("/studios/:id", verifyAuth, securityCheck, validateId, async (req, res) => {
