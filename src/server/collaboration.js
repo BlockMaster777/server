@@ -57,9 +57,15 @@ export const resolveProjectAccess = (index, projectId, userId) => {
 
 	const position = collaborators.findIndex((member) => member.userId === String(user.id));
 	if (position === -1) throw new CollaborationError(403, "Collaboration access denied");
-	if (position >= (owner.role === "dash-supporter" || owner.role === "dashteam") ? 5 : 2) {
-		throw new CollaborationError(403, "Project collaborators limit reached" +
-			owner.role !== "dash-supporter" && owner.role !== "dashteam" ? " - donate Dash to add more collaborators: https://dashblocks.org/donate" : ""
+	if (position >= ((owner.role === "dash-supporter" || owner.role === "dashteam") ? 5 : 2)) {
+		throw new CollaborationError(
+			403,
+			"Project collaborators limit reached" +
+			(
+				owner.role !== "dash-supporter" && owner.role !== "dashteam"
+					? " - donate Dash to add more collaborators: https://dashblocks.org/donate"
+					: ""
+			)
 		);
 	}
 
@@ -106,7 +112,7 @@ const checkOrigin = (req, res, next) => {
 };
 
 const formatCollaboration = (index, access) => {
-	const limit = access.owner.role === "dash-supporter" ? 5 : 2;
+	const limit = (access.owner.role === "dash-supporter" || access.owner.role === "dashteam") ? 5 : 2;
 	return {
 		ok: true,
 		projectId: String(access.project.id),
