@@ -1,5 +1,6 @@
 import app from "../app.js";
 import {
+	generateUserObject,
 	getProjectStudiosCount,
 	securityCheck,
 	searchLimiter,
@@ -364,6 +365,6 @@ app.get("/search/studios", searchLimiter, searchTimeout, securityCheck, async (r
 			results: finalResults
 		});
 	} catch (_) {
-		res.status(500).json({ ok: false, error: `${_}` /*"Failed to search studios"*/ });
+		res.status(500).json({ ok: false, error: "Failed to search studios" });
 	}
 });
