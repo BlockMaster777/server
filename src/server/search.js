@@ -29,7 +29,7 @@ const STUDIOS_SORT_METHODS = {
 	"a-create": function(s1, s2) {
 		return this["d-create"](s1, s2) * -1;
 	},
-	"d-projects": (s1, s2) => (s2.projects || []).length - (s1.projects || []).length
+	"d-projects": (s1, s2) => s2.projectsCount - s1.projectsCount
 };
 
 const PROJECTS_SEARCH_PARAMS_DEFS = {
