@@ -23,8 +23,7 @@ app.post("/payments/create", verifyAuth, securityCheck, async (req, res) => {
 	const body = {
 		offerId,
 		currency: currency.toUpperCase(),
-		email: fakeEmail,
-		promoCode: "NEW50"
+		email: fakeEmail
 	};
 
 	if (method) {
