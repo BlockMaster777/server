@@ -314,7 +314,7 @@ app.get("/search/studios", searchLimiter, searchTimeout, securityCheck, async (r
 				}
 			})
 			.toLowerCase();
-		if (!sortMethod) sortMethod = "d-created";
+		if (!sortMethod) sortMethod = "d-create";
 		searchParams.sort(([paramName1], [paramName2]) =>
 			STUDIOS_SEARCH_PARAMS_DEFS[paramName1].priority - STUDIOS_SEARCH_PARAMS_DEFS[paramName2].priority);
 
