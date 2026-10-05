@@ -128,7 +128,12 @@ const formatCollaboration = (index, access) => {
 		revision: access.project.collaborationRevision || 0,
 		role: access.role,
 		collaboratorLimit: limit,
-		owner: { userId: String(access.owner.id), username: access.owner.username },
+		owner: {
+			...generateUserObject(
+				Object.values(index.users).find((user) => String(user.id) === access.owner.id),
+				index
+			)
+		},
 		collaborators: access.collaborators.map((member, position) => ({
 			...generateUserObject(
 				Object.values(index.users).find((user) => String(user.id) === member.userId),
