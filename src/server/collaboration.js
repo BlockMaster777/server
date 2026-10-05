@@ -3,6 +3,7 @@ import JSZip from "jszip";
 import jwt from "jsonwebtoken";
 import fs from "node:fs/promises";
 import path from "node:path";
+import { isDeepStrictEqual } from "node:util";
 import { WebSocket, WebSocketServer } from "ws";
 import * as Y from "yjs";
 
@@ -272,11 +273,13 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 	if (!project || !Array.isArray(project.targets) || !project.targets.length) {
 		throw new CollaborationError(400, "Project has no targets");
 	}
+	project = structuredClone(project);
+	expandPrimitiveBlocks(project);
 	const doc = new Y.Doc();
 	const ids = new Set();
 	doc.transact(() => {
 		const meta = doc.getMap("collaboration");
-		meta.set("schemaVersion", 1);
+		meta.set("schemaVersion", 2);
 		meta.set("projectId", String(projectId));
 		meta.set("sourceHash", sourceHash);
 		const root = doc.getMap("project");
@@ -311,7 +314,7 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 		doc.getArray("targetOrder").insert(0, order);
 	});
 	try {
-		readCollaborationProject(doc, projectId);
+		validateBlockGraph(readCollaborationProject(doc, projectId));
 		if (Y.encodeStateAsUpdate(doc).length > 2 * 1024 * 1024) {
 			throw new CollaborationError(413, "Project is too large for the current collaboration limit");
 		}
@@ -322,11 +325,65 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 	}
 };
 
-const readCollaborationProject = (doc, projectId) => {
+const primitiveBlockTypes = {
+	4: ["math_number", "NUM"],
+	5: ["math_positive_number", "NUM"],
+	6: ["math_whole_number", "NUM"],
+	7: ["math_integer", "NUM"],
+	8: ["math_angle", "NUM"],
+	9: ["colour_picker", "COLOUR"],
+	10: ["text", "TEXT"],
+	11: ["event_broadcast_menu", "BROADCAST_OPTION"],
+	12: ["data_variable", "VARIABLE"],
+	13: ["data_listcontents", "LIST"]
+};
+
+const expandPrimitiveBlocks = (project) => {
+	for (const target of project.targets) {
+		const blocks = target.blocks;
+		if (!blocks || typeof blocks !== "object" || Array.isArray(blocks)) {
+			throw new CollaborationError(400, "Invalid target blocks");
+		}
+		for (const [blockId, block] of Object.entries(blocks)) {
+			if (!block || typeof block !== "object" || Array.isArray(block) ||
+				!block.inputs || typeof block.inputs !== "object" || Array.isArray(block.inputs)) continue;
+			for (const input of Object.values(block.inputs)) {
+				if (!Array.isArray(input)) continue;
+				for (let index = 1; index < input.length; index++) {
+					const primitive = input[index];
+					if (!Array.isArray(primitive) || !Number.isInteger(primitive[0]) ||
+						!primitiveBlockTypes[primitive[0]]) continue;
+					const [opcode, fieldName] = primitiveBlockTypes[primitive[0]];
+					let entryId = `${blockId}:${index}`;
+					let suffix = 0;
+					while (Object.hasOwn(blocks, entryId)) {
+						entryId = `${blockId}:${index}:${suffix}`;
+						suffix += 1;
+					}
+					const fieldValue = primitive[0] >= 11
+						? [primitive[1], primitive.length > 2 ? primitive[2] : null]
+						: [primitive[1], null];
+					input[index] = entryId;
+					blocks[entryId] = {
+						opcode,
+						next: null,
+						parent: blockId,
+						inputs: {},
+						fields: { [fieldName]: fieldValue },
+						shadow: true,
+						topLevel: false
+					};
+				}
+			}
+		}
+	}
+};
+
+const readCollaborationProject = (doc, projectId, schemaVersion = 2) => {
 	const allowed = ["collaboration", "project", "targets", "targetOrder"];
 	if ([...doc.share.keys()].some((key) => !allowed.includes(key))) throw new Error("Unknown collaboration root");
 	const meta = doc.getMap("collaboration");
-	if (meta.get("schemaVersion") !== 1 || meta.get("projectId") !== String(projectId) ||
+	if (meta.get("schemaVersion") !== schemaVersion || meta.get("projectId") !== String(projectId) ||
 		typeof meta.get("sourceHash") !== "string" || !/^[a-f0-9]{64}$/.test(meta.get("sourceHash")) || meta.size !== 3) {
 		throw new Error("Invalid collaboration metadata");
 	}
@@ -351,7 +408,108 @@ const readCollaborationProject = (doc, projectId) => {
 		return value;
 	});
 	if (stages !== 1) throw new Error("Project must contain exactly one stage");
+	expandPrimitiveBlocks(project);
+	validateBlockGraph(project);
 	return project;
+};
+
+const editableTargetScalars = new Set([
+	"name", "x", "y", "size", "direction", "visible", "draggable", "rotationStyle",
+	"currentCostume", "layerOrder", "tempo", "volume", "videoTransparency", "videoState",
+	"textToSpeechLanguage"
+]);
+const editableTargetMaps = new Set(["blocks", "variables", "lists", "broadcasts", "comments"]);
+
+const validateBlockGraph = (project) => {
+	for (const target of project.targets) {
+		const blocks = target.blocks;
+		if (!blocks || typeof blocks !== "object" || Array.isArray(blocks)) throw new Error("Invalid blocks map");
+		const parentCounts = new Map(Object.keys(blocks).map((id) => [id, 0]));
+		const children = new Map(Object.keys(blocks).map((id) => [id, []]));
+		const addEdge = (parentId, childId) => {
+			if (childId === null) return;
+			if (typeof childId !== "string" || !Object.hasOwn(blocks, childId)) throw new Error("Missing block reference");
+			parentCounts.set(childId, parentCounts.get(childId) + 1);
+			children.get(parentId).push(childId);
+		};
+
+		for (const [id, block] of Object.entries(blocks)) {
+			if (!/^[\x21-\x7e]{1,128}$/.test(id) || !block || typeof block !== "object" || Array.isArray(block) ||
+				typeof block.opcode !== "string" || !block.opcode ||
+				(block.next !== null && typeof block.next !== "string") ||
+				(block.parent !== null && typeof block.parent !== "string") ||
+				typeof block.shadow !== "boolean" || typeof block.topLevel !== "boolean" ||
+				!block.inputs || typeof block.inputs !== "object" || Array.isArray(block.inputs) ||
+				!block.fields || typeof block.fields !== "object" || Array.isArray(block.fields)) {
+				throw new Error("Invalid block record");
+			}
+			if (block.topLevel && (block.parent !== null || block.shadow ||
+				!Number.isFinite(block.x) || !Number.isFinite(block.y))) throw new Error("Invalid top-level block");
+			if (!block.topLevel && block.parent === null) throw new Error("Invalid block parent");
+			if (block.next !== null) addEdge(id, block.next);
+			for (const input of Object.values(block.inputs)) {
+				if (!Array.isArray(input) || ![1, 2, 3].includes(input[0]) || input.length < 2 || input.length > 3) {
+					throw new Error("Invalid block input");
+				}
+				for (const reference of input.slice(1)) addEdge(id, reference);
+			}
+		}
+
+		for (const [id, block] of Object.entries(blocks)) {
+			const count = parentCounts.get(id);
+			if (count > 1 || (block.topLevel ? count !== 0 : count !== 1)) throw new Error("Invalid block ownership");
+			if (!block.topLevel && !Object.hasOwn(blocks, block.parent)) throw new Error("Missing block parent");
+			if (!block.topLevel && children.get(block.parent).filter((childId) => childId === id).length !== 1) {
+				throw new Error("Block parent does not match its references");
+			}
+		}
+
+		const pendingParents = new Map([...parentCounts].map(([id, count]) => [id, count]));
+		const roots = [...pendingParents].filter(([, count]) => count === 0).map(([id]) => id);
+		let visited = 0;
+		while (roots.length) {
+			const id = roots.pop();
+			visited++;
+			for (const childId of children.get(id)) {
+				pendingParents.set(childId, pendingParents.get(childId) - 1);
+				if (pendingParents.get(childId) === 0) roots.push(childId);
+			}
+		}
+		if (visited !== Object.keys(blocks).length) throw new Error("Block graph contains a cycle");
+	}
+};
+
+const assertAllowedCollaborationChanges = (previous, candidate) => {
+	const previousRoot = { ...previous };
+	const candidateRoot = { ...candidate };
+	delete previousRoot.targets;
+	delete candidateRoot.targets;
+	if (!isDeepStrictEqual(previousRoot, candidateRoot)) throw new Error("Project settings cannot be changed");
+
+	const previousTargets = new Map(previous.targets.map((target) => [target.collaborationId, target]));
+	const candidateTargets = new Map(candidate.targets.map((target) => [target.collaborationId, target]));
+	const previousStage = previous.targets.find((target) => target.isStage);
+	const candidateStage = candidate.targets.find((target) => target.isStage);
+	if (!candidateStage || candidateStage.collaborationId !== previousStage.collaborationId) {
+		throw new Error("The stage cannot be replaced or removed");
+	}
+
+	for (const [id, target] of previousTargets) {
+		const nextTarget = candidateTargets.get(id);
+		if (!nextTarget) {
+			if (target.isStage) throw new Error("The stage cannot be removed");
+			continue;
+		}
+		if (target.isStage !== nextTarget.isStage) throw new Error("Target type cannot be changed");
+		const keys = new Set([...Object.keys(target), ...Object.keys(nextTarget)]);
+		for (const key of keys) {
+			if (key === "collaborationId" || key === "isStage" || editableTargetScalars.has(key) || editableTargetMaps.has(key)) continue;
+			if (!isDeepStrictEqual(target[key], nextTarget[key])) throw new Error("Target assets and properties cannot be changed");
+		}
+	}
+	for (const target of candidate.targets) {
+		if (!previousTargets.has(target.collaborationId) && target.isStage) throw new Error("The stage cannot be replaced");
+	}
 };
 
 export const attachCollaborationWebSocket = (server) => {
@@ -651,7 +809,10 @@ export const attachCollaborationWebSocket = (server) => {
 							try {
 								Y.applyUpdate(candidate, Y.encodeStateAsUpdate(next));
 								Y.applyUpdate(candidate, item.update);
-								readCollaborationProject(candidate, room.id);
+								const previous = readCollaborationProject(next, room.id);
+								const proposed = readCollaborationProject(candidate, room.id);
+								assertAllowedCollaborationChanges(previous, proposed);
+								validateBlockGraph(proposed);
 								if (candidate.getMap("collaboration").get("sourceHash") !== room.sourceHash) {
 									throw new Error("Source archive cannot be changed by a document update");
 								}
