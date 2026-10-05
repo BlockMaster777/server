@@ -124,13 +124,13 @@ const formatCollaboration = (index, access) => {
 	const limit = (access.owner.role === "dash-supporter" || access.owner.role === "dashteam") ? 5 : 2;
 	return {
 		ok: true,
-		projectId: String(access.project.id),
+		projectId: Number(access.project.id),
 		revision: access.project.collaborationRevision || 0,
 		role: access.role,
 		collaboratorLimit: limit,
 		owner: {
 			...generateUserObject(
-				Object.values(index.users).find((user) => String(user.id) === access.owner.id),
+				Object.values(index.users).find((user) => String(user.id) === String(access.owner.id)),
 				index
 			)
 		},
