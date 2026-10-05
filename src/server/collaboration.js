@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+import { randomUUID, createHash } from "node:crypto";
+import JSZip from "jszip";
 import jwt from "jsonwebtoken";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -15,6 +16,7 @@ import {
 import * as storage from "./storage.js";
 
 const collaborationRooms = new Map();
+let collaborationImportQueue = Promise.resolve();
 
 class CollaborationError extends Error {
 	constructor(status, message) {
@@ -258,6 +260,92 @@ app.post("/projects/:id/collaboration-token", verifyAuth, securityCheck, validat
 	}
 });
 
+const createCollaborationDocument = (project, projectId, sourceHash) => {
+	if (!project || !Array.isArray(project.targets) || !project.targets.length) {
+		throw new CollaborationError(400, "Project has no targets");
+	}
+	const doc = new Y.Doc();
+	const ids = new Set();
+	doc.transact(() => {
+		const meta = doc.getMap("collaboration");
+		meta.set("schemaVersion", 1);
+		meta.set("projectId", String(projectId));
+		meta.set("sourceHash", sourceHash);
+		const root = doc.getMap("project");
+		for (const [key, value] of Object.entries(project)) {
+			if (key !== "targets") root.set(key, value);
+		}
+		const targets = doc.getMap("targets");
+		const order = [];
+		for (const source of project.targets) {
+			if (!source || typeof source !== "object" || Array.isArray(source)) {
+				throw new CollaborationError(400, "Invalid project target");
+			}
+			let id = source.collaborationId;
+			if (typeof id !== "string" || !/^[\x21-\x7e]{1,128}$/.test(id) || ids.has(id)) id = randomUUID();
+			ids.add(id);
+			order.push(id);
+			const target = new Y.Map();
+			targets.set(id, target);
+			for (const [key, value] of Object.entries(source)) {
+				if (["blocks", "variables", "lists", "broadcasts", "comments"].includes(key)) continue;
+				if (key !== "collaborationId") target.set(key, value);
+			}
+			target.set("collaborationId", id);
+			for (const key of ["blocks", "variables", "lists", "broadcasts", "comments"]) {
+				const entries = source[key] || {};
+				if (typeof entries !== "object" || Array.isArray(entries)) throw new CollaborationError(400, "Invalid target data");
+				const map = new Y.Map();
+				target.set(key, map);
+				for (const [entryId, value] of Object.entries(entries)) map.set(entryId, value);
+			}
+		}
+		doc.getArray("targetOrder").insert(0, order);
+	});
+	try {
+		readCollaborationProject(doc, projectId);
+		if (Y.encodeStateAsUpdate(doc).length > 2 * 1024 * 1024) {
+			throw new CollaborationError(413, "Project is too large for the current collaboration limit");
+		}
+		return doc;
+	} catch (error) {
+		doc.destroy();
+		throw error;
+	}
+};
+
+const readCollaborationProject = (doc, projectId) => {
+	const allowed = ["collaboration", "project", "targets", "targetOrder"];
+	if ([...doc.share.keys()].some((key) => !allowed.includes(key))) throw new Error("Unknown collaboration root");
+	const meta = doc.getMap("collaboration");
+	if (meta.get("schemaVersion") !== 1 || meta.get("projectId") !== String(projectId) ||
+		typeof meta.get("sourceHash") !== "string" || !/^[a-f0-9]{64}$/.test(meta.get("sourceHash")) || meta.size !== 3) {
+		throw new Error("Invalid collaboration metadata");
+	}
+	const targets = doc.getMap("targets");
+	const order = doc.getArray("targetOrder").toArray();
+	if (!order.length || order.length > 1000 || order.length !== targets.size || new Set(order).size !== order.length) {
+		throw new Error("Invalid target order");
+	}
+	const project = doc.getMap("project").toJSON();
+	let stages = 0;
+	project.targets = order.map((id) => {
+		if (typeof id !== "string" || !/^[\x21-\x7e]{1,128}$/.test(id)) throw new Error("Invalid target ID");
+		const target = targets.get(id);
+		if (!(target instanceof Y.Map) || target.get("collaborationId") !== id) throw new Error("Invalid target record");
+		for (const key of ["blocks", "variables", "lists", "broadcasts", "comments"]) {
+			if (!(target.get(key) instanceof Y.Map)) throw new Error("Invalid target map");
+		}
+		const value = target.toJSON();
+		if (typeof value.isStage !== "boolean" || typeof value.name !== "string" ||
+			!Array.isArray(value.costumes) || !Array.isArray(value.sounds)) throw new Error("Invalid target properties");
+		if (value.isStage) stages++;
+		return value;
+	});
+	if (stages !== 1) throw new Error("Project must contain exactly one stage");
+	return project;
+};
+
 export const attachCollaborationWebSocket = (server) => {
 	const wss = new WebSocketServer({ noServer: true, maxPayload: 384 * 1024, perMessageDeflate: false });
 	const directory = path.join(vars.DATA_PATH, "collaboration");
@@ -315,28 +403,82 @@ export const attachCollaborationWebSocket = (server) => {
 		if (collaborationRooms.size >= 25) throw new CollaborationError(429, "Too many active rooms");
 		room = { id, epoch: randomUUID(), doc: new Y.Doc(), clients: new Set(), pending: [], busy: false, loading: true, failed: false, touched: Date.now() };
 		collaborationRooms.set(id, room);
-		room.queue = (async () => {
+		const initialize = collaborationImportQueue.then(async () => {
 			const file = path.join(directory, `${id}.json`);
+			room.sourcePath = path.join(directory, `${id}.source.zip`);
 			let data;
 			try {
 				const stat = await fs.stat(file);
 				if (stat.size > 3 * 1024 * 1024) throw new Error("Collaboration file too large");
 				data = JSON.parse(await fs.readFile(file, "utf8"));
-			} catch (error) {
-				if (error.code !== "ENOENT") throw error;
-			}
-			if (data) {
-				if (data.version !== 1 || typeof data.epoch !== "string" || typeof data.data !== "string") {
+				if (!data || data.version !== 1 || typeof data.epoch !== "string" || typeof data.data !== "string") {
 					throw new Error("Invalid collaboration file");
 				}
 				room.epoch = data.epoch;
 				const update = Buffer.from(data.data, "base64");
 				if (update.length > 2 * 1024 * 1024) throw new Error("Collaboration document too large");
 				Y.applyUpdate(room.doc, update);
-			} else {
-				await save(room, Y.encodeStateAsUpdate(room.doc));
+			} catch (error) {
+				if (error.code !== "ENOENT") throw error;
 			}
-		})().catch((error) => {
+			if (!room.doc.getMap("collaboration").has("schemaVersion")) {
+				if (Y.encodeStateAsUpdate(room.doc).length !== 2) {
+					throw new CollaborationError(409, "Room contains legacy test data; migrate it before continuing");
+				}
+				const projectPath = path.join(vars.DATA_PROJECTS_PATH, id, `${id}.zip`);
+				const stat = await fs.stat(projectPath);
+				if (stat.size > 250 * 1024 * 1024) throw new CollaborationError(413, "Project archive is too large");
+				await fs.mkdir(directory, { recursive: true });
+				const temporary = `${room.sourcePath}.${randomUUID()}.tmp`;
+				try {
+					await fs.copyFile(projectPath, temporary);
+					if ((await fs.stat(temporary)).size > 250 * 1024 * 1024) throw new Error("Project archive is too large");
+					const archive = await fs.readFile(temporary);
+					const hash = createHash("sha256").update(archive).digest("hex");
+					const zip = await JSZip.loadAsync(archive);
+					const entry = zip.file("project.json");
+					if (!entry) throw new CollaborationError(400, "project.json not found");
+					const text = await new Promise((resolve, reject) => {
+						const chunks = [];
+						let size = 0;
+						const stream = entry.nodeStream("nodebuffer");
+						stream.on("data", (chunk) => {
+							size += chunk.length;
+							if (size > 4 * 1024 * 1024) {
+								stream.destroy();
+								reject(new CollaborationError(413, "project.json is too large"));
+								return;
+							}
+							chunks.push(chunk);
+						});
+						stream.on("error", reject);
+						stream.on("end", () => resolve(Buffer.concat(chunks).toString("utf8")));
+					});
+					const project = JSON.parse(text);
+					const doc = createCollaborationDocument(project, id, hash);
+					room.doc.destroy();
+					room.doc = doc;
+					room.epoch = randomUUID();
+					const handle = await fs.open(temporary, "r+");
+					try {
+						await handle.sync();
+					} finally {
+						await handle.close();
+					}
+					await fs.rename(temporary, room.sourcePath);
+					await save(room, Y.encodeStateAsUpdate(room.doc));
+				} finally {
+					await fs.rm(temporary, { force: true });
+				}
+			}
+			readCollaborationProject(room.doc, id);
+			room.sourceHash = room.doc.getMap("collaboration").get("sourceHash");
+			if ((await fs.stat(room.sourcePath)).size > 250 * 1024 * 1024) throw new Error("Source archive too large");
+			const source = await fs.readFile(room.sourcePath);
+			if (createHash("sha256").update(source).digest("hex") !== room.sourceHash) throw new Error("Source archive changed");
+		});
+		collaborationImportQueue = initialize.catch(() => {});
+		room.queue = initialize.catch((error) => {
 			room.failed = true;
 			collaborationRooms.delete(id);
 			room.doc.destroy();
@@ -344,6 +486,29 @@ export const attachCollaborationWebSocket = (server) => {
 		}).finally(() => { room.loading = false; });
 		return room;
 	};
+
+	app.get("/projects/:id/collaboration-source", verifyAuth, securityCheck, validateId, async (req, res) => {
+		try {
+			resolveProjectAccess(await storage.getIndex(), req.params.id, req.user.userId);
+			const room = load(String(req.params.id));
+			await room.queue;
+			if (room.failed) throw new Error("Room unavailable");
+			resolveProjectAccess(await storage.getIndex(), req.params.id, req.user.userId);
+			room.touched = Date.now();
+			res.set("Cache-Control", "no-store");
+			res.type("application/zip");
+			res.sendFile(room.sourcePath, (error) => {
+				if (!error) return;
+				if (res.headersSent) res.destroy(error);
+				else res.status(500).json({ ok: false, error: "Could not read collaboration source" });
+			});
+		} catch (error) {
+			res.status(error instanceof CollaborationError ? error.status : 500).json({
+				ok: false,
+				error: error instanceof CollaborationError ? error.message : "Collaboration source unavailable"
+			});
+		}
+	});
 
 	const upgrade = (req, socket, head) => {
 		socket.on("error", () => socket.destroy());
@@ -478,6 +643,10 @@ export const attachCollaborationWebSocket = (server) => {
 							try {
 								Y.applyUpdate(candidate, Y.encodeStateAsUpdate(next));
 								Y.applyUpdate(candidate, item.update);
+								readCollaborationProject(candidate, room.id);
+								if (candidate.getMap("collaboration").get("sourceHash") !== room.sourceHash) {
+									throw new Error("Source archive cannot be changed by a document update");
+								}
 								if (candidate.store.pendingStructs || candidate.store.pendingDs || Y.encodeStateAsUpdate(candidate).length > 2 * 1024 * 1024) {
 									throw new Error("Invalid document");
 								}
