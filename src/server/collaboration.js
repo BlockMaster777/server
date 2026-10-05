@@ -139,6 +139,7 @@ const formatCollaboration = (index, access) => {
 				Object.values(index.users).find((user) => String(user.id) === member.userId),
 				index
 			),
+			collaborationRole: member.role,
 			addedAt: member.addedAt,
 			active: position < limit
 		}))
