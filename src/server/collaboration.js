@@ -11,7 +11,8 @@ import * as vars from "./vars.js";
 import {
 	validateId,
 	securityCheck,
-	verifyAuth
+	verifyAuth,
+	generateUserObject
 } from "./helpers.js";
 import * as storage from "./storage.js";
 
@@ -129,9 +130,10 @@ const formatCollaboration = (index, access) => {
 		collaboratorLimit: limit,
 		owner: { userId: String(access.owner.id), username: access.owner.username },
 		collaborators: access.collaborators.map((member, position) => ({
-			userId: member.userId,
-			username: Object.values(index.users).find((user) => String(user.id) === member.userId)?.username || "User",
-			role: member.role,
+			...generateUserObject(
+				Object.values(index.users).find((user) => String(user.id) === member.userId),
+				index
+			),
 			addedAt: member.addedAt,
 			active: position < limit
 		}))
