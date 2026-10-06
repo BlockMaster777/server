@@ -308,7 +308,27 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 				if (typeof entries !== "object" || Array.isArray(entries)) throw new CollaborationError(400, "Invalid target data");
 				const map = new Y.Map();
 				target.set(key, map);
-				for (const [entryId, value] of Object.entries(entries)) map.set(entryId, value);
+				for (const [entryId, value] of Object.entries(entries)) {
+					if (key === "blocks") {
+						if (!value || typeof value !== "object" || Array.isArray(value) ||
+							!value.fields || typeof value.fields !== "object" || Array.isArray(value.fields)) {
+							throw new CollaborationError(400, "Invalid block data");
+						}
+						const block = new Y.Map();
+						for (const [property, propertyValue] of Object.entries(value)) {
+							if (property === "fields") {
+								const fields = new Y.Map();
+								for (const [field, fieldValue] of Object.entries(propertyValue)) fields.set(field, fieldValue);
+								block.set(property, fields);
+							} else {
+								block.set(property, propertyValue);
+							}
+						}
+						map.set(entryId, block);
+					} else {
+						map.set(entryId, value);
+					}
+				}
 			}
 		}
 		doc.getArray("targetOrder").insert(0, order);
@@ -344,6 +364,24 @@ const expandPrimitiveBlocks = (project) => {
 		if (!blocks || typeof blocks !== "object" || Array.isArray(blocks)) {
 			throw new CollaborationError(400, "Invalid target blocks");
 		}
+		for (const [blockId, primitive] of Object.entries(blocks)) {
+			if (!Array.isArray(primitive) || !Number.isInteger(primitive[0]) ||
+				!primitiveBlockTypes[primitive[0]]) continue;
+			const [opcode, fieldName] = primitiveBlockTypes[primitive[0]];
+			blocks[blockId] = {
+				opcode,
+				next: null,
+				parent: null,
+				inputs: {},
+				fields: { [fieldName]: primitive[0] >= 11
+					? [primitive[1], primitive.length > 2 ? primitive[2] : null]
+					: [primitive[1], null] },
+				shadow: false,
+				topLevel: true,
+				x: 0,
+				y: 0
+			};
+		}
 		for (const [blockId, block] of Object.entries(blocks)) {
 			if (!block || typeof block !== "object" || Array.isArray(block) ||
 				!block.inputs || typeof block.inputs !== "object" || Array.isArray(block.inputs)) continue;
@@ -363,6 +401,9 @@ const expandPrimitiveBlocks = (project) => {
 					const fieldValue = primitive[0] >= 11
 						? [primitive[1], primitive.length > 2 ? primitive[2] : null]
 						: [primitive[1], null];
+					const inputType = input[0];
+					const shadow = primitive[0] < 12 &&
+						((inputType === 1 && index === 1) || (inputType === 3 && index === 2));
 					input[index] = entryId;
 					blocks[entryId] = {
 						opcode,
@@ -370,7 +411,7 @@ const expandPrimitiveBlocks = (project) => {
 						parent: blockId,
 						inputs: {},
 						fields: { [fieldName]: fieldValue },
-						shadow: true,
+						shadow,
 						topLevel: false
 					};
 				}
@@ -379,7 +420,12 @@ const expandPrimitiveBlocks = (project) => {
 	}
 };
 
-const readCollaborationProject = (doc, projectId, schemaVersion = 2) => {
+const readCollaborationProject = (
+	doc,
+	projectId,
+	schemaVersion = 2,
+	{ requireBlockMaps = true, validateGraph = true } = {}
+) => {
 	const allowed = ["collaboration", "project", "targets", "targetOrder"];
 	if ([...doc.share.keys()].some((key) => !allowed.includes(key))) throw new Error("Unknown collaboration root");
 	const meta = doc.getMap("collaboration");
@@ -401,6 +447,13 @@ const readCollaborationProject = (doc, projectId, schemaVersion = 2) => {
 		for (const key of ["blocks", "variables", "lists", "broadcasts", "comments"]) {
 			if (!(target.get(key) instanceof Y.Map)) throw new Error("Invalid target map");
 		}
+		if (requireBlockMaps) {
+			for (const block of target.get("blocks").values()) {
+				if (!(block instanceof Y.Map) || !(block.get("fields") instanceof Y.Map)) {
+					throw new Error("Invalid block map");
+				}
+			}
+		}
 		const value = target.toJSON();
 		if (typeof value.isStage !== "boolean" || typeof value.name !== "string" ||
 			!Array.isArray(value.costumes) || !Array.isArray(value.sounds)) throw new Error("Invalid target properties");
@@ -408,8 +461,7 @@ const readCollaborationProject = (doc, projectId, schemaVersion = 2) => {
 		return value;
 	});
 	if (stages !== 1) throw new Error("Project must contain exactly one stage");
-	expandPrimitiveBlocks(project);
-	validateBlockGraph(project);
+	if (validateGraph) validateBlockGraph(project);
 	return project;
 };
 
@@ -636,6 +688,24 @@ export const attachCollaborationWebSocket = (server) => {
 				} finally {
 					await fs.rm(temporary, { force: true });
 				}
+			}
+			const schemaVersion = room.doc.getMap("collaboration").get("schemaVersion");
+			if (schemaVersion === 1) {
+				const project = readCollaborationProject(room.doc, id, 1, {
+					requireBlockMaps: false,
+					validateGraph: false
+				});
+				const migrated = createCollaborationDocument(
+					project,
+					id,
+					room.doc.getMap("collaboration").get("sourceHash")
+				);
+				room.doc.destroy();
+				room.doc = migrated;
+				room.epoch = randomUUID();
+				await save(room, Y.encodeStateAsUpdate(room.doc));
+			} else if (schemaVersion !== 2) {
+				throw new Error("Unsupported collaboration schema");
 			}
 			readCollaborationProject(room.doc, id);
 			room.sourceHash = room.doc.getMap("collaboration").get("sourceHash");
