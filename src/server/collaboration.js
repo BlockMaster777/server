@@ -279,7 +279,7 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 	const ids = new Set();
 	doc.transact(() => {
 		const meta = doc.getMap("collaboration");
-		meta.set("schemaVersion", 2);
+		meta.set("schemaVersion", 3);
 		meta.set("projectId", String(projectId));
 		meta.set("sourceHash", sourceHash);
 		const root = doc.getMap("project");
@@ -311,15 +311,16 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 				for (const [entryId, value] of Object.entries(entries)) {
 					if (key === "blocks") {
 						if (!value || typeof value !== "object" || Array.isArray(value) ||
-							!value.fields || typeof value.fields !== "object" || Array.isArray(value.fields)) {
+							!value.fields || typeof value.fields !== "object" || Array.isArray(value.fields) ||
+							!value.inputs || typeof value.inputs !== "object" || Array.isArray(value.inputs)) {
 							throw new CollaborationError(400, "Invalid block data");
 						}
 						const block = new Y.Map();
 						for (const [property, propertyValue] of Object.entries(value)) {
-							if (property === "fields") {
-								const fields = new Y.Map();
-								for (const [field, fieldValue] of Object.entries(propertyValue)) fields.set(field, fieldValue);
-								block.set(property, fields);
+							if (property === "fields" || property === "inputs") {
+								const entries = new Y.Map();
+								for (const [entry, entryValue] of Object.entries(propertyValue)) entries.set(entry, entryValue);
+								block.set(property, entries);
 							} else {
 								block.set(property, propertyValue);
 							}
@@ -332,6 +333,7 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 			}
 		}
 		doc.getArray("targetOrder").insert(0, order);
+		doc.getMap("targetSequence").set("ids", [...order]);
 	});
 	try {
 		validateBlockGraph(readCollaborationProject(doc, projectId));
@@ -344,7 +346,6 @@ const createCollaborationDocument = (project, projectId, sourceHash) => {
 		throw error;
 	}
 };
-
 const primitiveBlockTypes = {
 	4: ["math_number", "NUM"],
 	5: ["math_positive_number", "NUM"],
@@ -378,8 +379,8 @@ const expandPrimitiveBlocks = (project) => {
 					: [primitive[1], null] },
 				shadow: false,
 				topLevel: true,
-				x: 0,
-				y: 0
+				x: primitive[3] ?? 0,
+				y: primitive[4] ?? 0
 			};
 		}
 		for (const [blockId, block] of Object.entries(blocks)) {
@@ -423,10 +424,11 @@ const expandPrimitiveBlocks = (project) => {
 const readCollaborationProject = (
 	doc,
 	projectId,
-	schemaVersion = 2,
+	schemaVersion = 3,
 	{ requireBlockMaps = true, validateGraph = true } = {}
 ) => {
 	const allowed = ["collaboration", "project", "targets", "targetOrder"];
+	if (schemaVersion === 3) allowed.push("targetSequence");
 	if ([...doc.share.keys()].some((key) => !allowed.includes(key))) throw new Error("Unknown collaboration root");
 	const meta = doc.getMap("collaboration");
 	if (meta.get("schemaVersion") !== schemaVersion || meta.get("projectId") !== String(projectId) ||
@@ -434,9 +436,28 @@ const readCollaborationProject = (
 		throw new Error("Invalid collaboration metadata");
 	}
 	const targets = doc.getMap("targets");
-	const order = doc.getArray("targetOrder").toArray();
+	const membership = doc.getArray("targetOrder").toArray();
+	let order = membership;
 	if (!order.length || order.length > 1000 || order.length !== targets.size || new Set(order).size !== order.length) {
 		throw new Error("Invalid target order");
+	}
+	if (schemaVersion === 3) {
+		const sequence = doc.getMap("targetSequence");
+		const preferred = sequence.get("ids");
+		if (sequence.size !== 1 || !Array.isArray(preferred) || preferred.length > 1000 ||
+			new Set(preferred).size !== preferred.length || preferred.some((id) =>
+			typeof id !== "string" || !/^[\x21-\x7e]{1,128}$/.test(id))) {
+			throw new Error("Invalid target sequence");
+		}
+		const members = new Set(membership);
+		order = preferred.filter((id) => members.has(id));
+		const ordered = new Set(order);
+		for (const id of membership) {
+			if (!ordered.has(id)) {
+				order.push(id);
+				ordered.add(id);
+			}
+		}
 	}
 	const project = doc.getMap("project").toJSON();
 	let stages = 0;
@@ -449,7 +470,8 @@ const readCollaborationProject = (
 		}
 		if (requireBlockMaps) {
 			for (const block of target.get("blocks").values()) {
-				if (!(block instanceof Y.Map) || !(block.get("fields") instanceof Y.Map)) {
+				if (!(block instanceof Y.Map) || !(block.get("fields") instanceof Y.Map) ||
+					!(block.get("inputs") instanceof Y.Map)) {
 					throw new Error("Invalid block map");
 				}
 			}
@@ -707,8 +729,8 @@ export const attachCollaborationWebSocket = (server) => {
 				}
 			}
 			const schemaVersion = room.doc.getMap("collaboration").get("schemaVersion");
-			if (schemaVersion === 1) {
-				const project = readCollaborationProject(room.doc, id, 1, {
+			if (schemaVersion === 1 || schemaVersion === 2) {
+				const project = readCollaborationProject(room.doc, id, schemaVersion, {
 					requireBlockMaps: false,
 					validateGraph: false
 				});
@@ -721,7 +743,7 @@ export const attachCollaborationWebSocket = (server) => {
 				room.doc = migrated;
 				room.epoch = randomUUID();
 				await save(room, Y.encodeStateAsUpdate(room.doc));
-			} else if (schemaVersion !== 2) {
+			} else if (schemaVersion !== 3) {
 				throw new Error("Unsupported collaboration schema");
 			}
 			readCollaborationProject(room.doc, id);
