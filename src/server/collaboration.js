@@ -532,6 +532,14 @@ const validateBlockGraph = (project) => {
 };
 
 const assertAllowedCollaborationChanges = (previous, candidate) => {
+	const assetIdentity = (value) => {
+		if (Array.isArray(value)) return value.map(assetIdentity);
+		if (value && typeof value === "object") {
+			return Object.fromEntries(Object.keys(value).sort().map((key) => [key, assetIdentity(value[key])]));
+		}
+		return value;
+	};
+	const assetKey = (asset) => JSON.stringify(assetIdentity(asset));
 	const previousRoot = { ...previous };
 	const candidateRoot = { ...candidate };
 	delete previousRoot.targets;
@@ -540,6 +548,8 @@ const assertAllowedCollaborationChanges = (previous, candidate) => {
 
 	const previousTargets = new Map(previous.targets.map((target) => [target.collaborationId, target]));
 	const candidateTargets = new Map(candidate.targets.map((target) => [target.collaborationId, target]));
+	const originalAssetSets = new Set(previous.targets.map((target) =>
+		JSON.stringify([target.costumes.map(assetKey), target.sounds.map(assetKey)])));
 	const previousStage = previous.targets.find((target) => target.isStage);
 	const candidateStage = candidate.targets.find((target) => target.isStage);
 	if (!candidateStage || candidateStage.collaborationId !== previousStage.collaborationId) {
@@ -560,7 +570,14 @@ const assertAllowedCollaborationChanges = (previous, candidate) => {
 		}
 	}
 	for (const target of candidate.targets) {
-		if (!previousTargets.has(target.collaborationId) && target.isStage) throw new Error("The stage cannot be replaced");
+		if (previousTargets.has(target.collaborationId)) continue;
+		if (target.isStage) throw new Error("The stage cannot be replaced");
+		if (!originalAssetSets.has(JSON.stringify([
+			target.costumes.map(assetKey),
+			target.sounds.map(assetKey)
+		]))) {
+			throw new Error("Target assets must come from the original project");
+		}
 	}
 };
 
