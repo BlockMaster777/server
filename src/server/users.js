@@ -330,6 +330,8 @@ app.post(
 
 // TODO Deprecated, use /user-avatars/:id
 app.get("/users/avatars/:id", async (req, res) => {
+  res.setHeader("Deprecation", "@<1791460800>")
+
 	try {
 		const avatarId = req.params.id;
 		const exists = await storage.avatarFileExists(avatarId);
